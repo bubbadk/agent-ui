@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AURA · Glass Intelligence</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --acc:#a78bfa;--accsoft:rgba(167,139,250,.24);
+  --cardop:.07;--cardblur:18px;--blobop:.55;
+  --fg:#f4f2ff;
+}
+body{min-height:100vh;font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:var(--fg);background:#0d0b1e;overflow-x:hidden;transition:background .3s}
+body[data-theme=sunset]{--acc:#fb923c;--accsoft:rgba(251,146,60,.24);background:#1a0e14}
+body[data-theme=ocean]{--acc:#38bdf8;--accsoft:rgba(56,189,248,.24);background:#0a1220}
+.blobs{position:fixed;inset:0;z-index:-2;filter:blur(90px);opacity:var(--blobop)}
+.blob{position:absolute;border-radius:50%;width:46vw;height:46vw;animation:float 26s ease-in-out infinite alternate}
+.b1{background:#7c3aed;top:-12%;left:-8%}
+.b2{background:#ec4899;top:18%;right:-12%;animation-delay:-8s}
+.b3{background:#06b6d4;bottom:-18%;left:22%;animation-delay:-15s}
+body[data-theme=sunset] .b1{background:#f97316}
+body[data-theme=sunset] .b2{background:#f43f5e}
+body[data-theme=sunset] .b3{background:#a855f7}
+body[data-theme=ocean] .b1{background:#2563eb}
+body[data-theme=ocean] .b2{background:#14b8a6}
+body[data-theme=ocean] .b3{background:#6366f1}
+@keyframes float{to{transform:translate(60px,40px) scale(1.08)}}
+.glass{background:rgba(255,255,255,var(--cardop));
+  backdrop-filter:blur(var(--cardblur)) saturate(150%);
+  -webkit-backdrop-filter:blur(var(--cardblur)) saturate(150%);
+  border:1px solid rgba(255,255,255,.14);border-radius:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.25)}
+.wrap{max-width:1240px;margin:0 auto;padding:36px 26px 70px}
+
+/* ── HERO ────────────────────────────────── */
+.hero{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}
+h1{font-size:31px;font-weight:650;letter-spacing:-.02em}
+.sub{opacity:.62;font-size:14px;margin-top:5px;font-weight:400}
+.fab{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  font-size:21px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.08);
+  backdrop-filter:blur(10px);transition:.35s cubic-bezier(.34,1.56,.64,1)}
+.fab:hover{transform:rotate(60deg) scale(1.06);border-color:var(--acc)}
+
+/* ── STATS ───────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat{padding:22px}
+.stat .ico{font-size:18px;opacity:.85;margin-bottom:12px}
+.stat .num{font-size:32px;font-weight:700;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.stat .num em{font-style:normal;font-size:14px;opacity:.55;font-weight:500}
+.stat .cap{font-size:12px;opacity:.6;margin-top:7px;letter-spacing:.05em}
+
+/* ── MAIN GRID ───────────────────────────── */
+.main{display:grid;grid-template-columns:1.5fr 1fr;gap:16px}
+.col{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{padding:24px}
+.card h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.58;
+  margin-bottom:18px;font-weight:600;display:flex;align-items:center;gap:10px}
+.dot{width:7px;height:7px;border-radius:50%;background:#34d399;animation:pulse 1.6s infinite;margin-left:auto}
+@keyframes pulse{50%{box-shadow:0 0 10px currentColor}}
+
+/* ── TASKS ───────────────────────────────── */
+.task{border-top:1px solid rgba(255,255,255,.1);padding:18px 0}
+.task:first-of-type{border-top:0;padding-top:2px}
+.tt{display:flex;justify-content:space-between;align-items:center;gap:12px;font-weight:550;font-size:15px}
+.badge{font-size:10.5px;padding:4px 11px;border-radius:99px;letter-spacing:.05em;white-space:nowrap;font-weight:550}
+.badge.verify{background:rgba(52,211,153,.16);color:#6ee7b7;border:1px solid rgba(52,211,153,.4)}
+.badge.run{background:rgba(96,165,250,.16);color:#93c5fd;border:1px solid rgba(96,165,250,.4)}
+.badge.plan{background:rgba(251,191,36,.14);color:#fcd34d;border:1px solid rgba(251,191,36,.35)}
+.steps{display:flex;gap:6px;margin-top:13px;flex-wrap:wrap}
+.step{font-size:11px;padding:5px 11px;border-radius:8px;background:rgba(255,255,255,.07);opacity:.72}
+.step.done{opacity:1;background:rgba(52,211,153,.14);color:#6ee7b7}
+.step.now{opacity:1;background:var(--accsoft);color:#fff}
+.pbar{height:6px;border-radius:99px;background:rgba(255,255,255,.09);margin-top:13px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--acc),#f0abfc);transition:width 1s}
+</style>
+<style>
+/* ── ROUTER ──────────────────────────────── */
+.lab2{display:flex;justify-content:space-between;font-size:11.5px;opacity:.65;margin-bottom:7px}
+.lab2 b{font-weight:600}
+.lane2{position:relative;height:26px;border-radius:99px;background:rgba(255,255,255,.08);
+  margin-bottom:18px;overflow:hidden}
+.pkt{position:absolute;top:50%;margin-top:-4px;width:8px;height:8px;border-radius:50%;
+  background:var(--acc);box-shadow:0 0 14px var(--acc);animation:flow var(--fd,3s) linear infinite}
+@keyframes flow{from{left:-10px}to{left:100%}}
+.route-sum{display:flex;justify-content:space-between;font-size:12px;opacity:.75;margin-top:4px}
+.route-sum b{color:#6ee7b7;font-weight:600}
+
+/* ── CONFIG MODAL ────────────────────────── */
+.modal{position:fixed;inset:0;display:none;place-items:center;z-index:50;
+  background:rgba(8,6,20,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.modal.open{display:grid}
+.modal .glass{width:min(500px,92vw);padding:28px;max-height:86vh;overflow-y:auto;
+  animation:pop .35s cubic-bezier(.34,1.56,.64,1)}
+@keyframes pop{from{transform:scale(.92) translateY(14px);opacity:0}}
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.mhead h2{font-size:19px;font-weight:650}
+.xbtn{cursor:pointer;font-size:18px;opacity:.6;background:none;border:0;color:inherit;padding:4px 8px}
+.xbtn:hover{opacity:1}
+.crow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;
+  border-bottom:1px solid rgba(255,255,255,.09);font-size:14px}
+.clab small{display:block;font-size:11.5px;opacity:.5;margin-top:2px}
+input[type=range]{accent-color:var(--acc);width:150px}
+.swatches{display:flex;gap:10px}
+.swb{width:30px;height:30px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s}
+.swb.on{border-color:#fff;transform:scale(1.12)}
+.themebtns{display:flex;gap:8px}
+.tbtn{font:inherit;font-size:12px;padding:7px 14px;border-radius:99px;cursor:pointer;
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);color:inherit;transition:.2s}
+.tbtn.on{background:var(--accsoft);border-color:var(--acc)}
+.tgl{width:44px;height:25px;border-radius:99px;background:rgba(255,255,255,.16);
+  position:relative;cursor:pointer;transition:.25s;flex-shrink:0}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:19px;height:19px;
+  border-radius:50%;background:#fff;transition:.25s}
+.tgl.on{background:var(--acc)}
+.tgl.on::after{left:22px}
+.mfoot{margin-top:18px;font-size:11.5px;opacity:.45;text-align:center}
+@media(max-width:960px){.stats{grid-template-columns:repeat(2,1fr)}.main{grid-template-columns:1fr}}
+</style>
+
+</head>
+<body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="wrap">
+
+  <header class="hero">
+    <div>
+      <h1>Good evening, Elias</h1>
+      <div class="sub">Your agents handled 6 tasks while you were away — everything verified. ✓</div>
+    </div>
+    <div class="glass fab" id="cfgFab">⚙</div>
+  </header>
+
+  <section class="stats" id="statsRow">
+    <div class="glass stat" data-mod="stats"><div class="ico">◈</div><div class="num" id="s1">128</div><div class="cap">Tasks completed · +6 today</div></div>
+    <div class="glass stat" data-mod="stats"><div class="ico">❋</div><div class="num" id="s2">41<em> MB</em></div><div class="cap">Context folded losslessly</div></div>
+    <div class="glass stat" data-mod="stats"><div class="ico">✓</div><div class="num" id="s3">98.4<em>%</em></div><div class="cap">Verification pass-rate</div></div>
+    <div class="glass stat" data-mod="stats"><div class="ico">◍</div><div class="num">$8.12<em> / $15</em></div><div class="cap">Budget used this month</div></div>
+  </section>
+
+  <div class="main">
+    <div class="col">
+      <div class="glass card" data-mod="tasks">
+        <h3>Active tasks <span class="dot"></span></h3>
+
+        <div class="task">
+          <div class="tt"><span>Migrate auth provider to OIDC</span><span class="badge verify">verified ✓</span></div>
+          <div class="steps"><span class="step done">plan</span><span class="step done">research</span><span class="step done">implement</span><span class="step done">tests pass</span></div>
+          <div class="pbar"><i style="width:100%"></i></div>
+        </div>
+
+        <div class="task">
+          <div class="tt"><span>Nightly backup audit</span><span class="badge run">running</span></div>
+          <div class="steps"><span class="step done">snapshot</span><span class="step now">integrity check</span><span class="step">report</span></div>
+          <div class="pbar"><i id="pb1" style="width:64%"></i></div>
+        </div>
+
+        <div class="task">
+          <div class="tt"><span>Design review — landing page</span><span class="badge plan">planned</span></div>
+          <div class="steps"><span class="step now">gather context</span><span class="step">critique</span><span class="step">proposal</span></div>
+          <div class="pbar"><i id="pb2" style="width:12%"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="glass card" data-mod="memory">
+        <h3>Memory constellation</h3>
+        <canvas id="memcanvas" style="width:100%;height:290px;display:block"></canvas>
+        <div style="font-size:11.5px;opacity:.55;margin-top:10px">Hybrid recall — semantic + keyword + recency. Nodes are memories; lines are associations formed during consolidation.</div>
+      </div>
+
+      <div class="glass card" data-mod="router">
+        <h3>Model router</h3>
+        <div class="lab2"><span><b>Local · 8B</b> — easy steps</span><span id="rl">64%</span></div>
+        <div class="lane2"><div class="pkt" style="--fd:2.6s"></div></div>
+        <div class="lab2"><span><b>Frontier</b> — hard reasoning</span><span id="rf">36%</span></div>
+        <div class="lane2"><div class="pkt" style="--fd:4.1s;animation-delay:-1.8s"></div><div class="pkt" style="--fd:5.3s;animation-delay:-.7s;background:#fbbf24;box-shadow:0 0 14px #fbbf24"></div></div>
+        <div class="route-sum"><span>Cascade routing active</span><span>$ saved today: <b id="rsave">$3.87</b></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="cfgModal">
+  <div class="glass">
+    <div class="mhead"><h2>Appearance &amp; behavior</h2><button class="xbtn" id="mx">✕</button></div>
+    <div class="crow"><div class="clab">Atmosphere<small>Gradient world behind the glass</small></div>
+      <div class="themebtns" id="thBtns"><button class="tbtn on" data-v="aurora">Aurora</button><button class="tbtn" data-v="sunset">Sunset</button><button class="tbtn" data-v="ocean">Ocean</button></div></div>
+    <div class="crow"><div class="clab">Accent<small>Tint of highlights &amp; progress</small></div>
+      <div class="swatches" id="acSw">
+        <div class="swb on" data-c="#a78bfa" style="background:#a78bfa"></div>
+        <div class="swb" data-c="#fb923c" style="background:#fb923c"></div>
+        <div class="swb" data-c="#34d399" style="background:#34d399"></div>
+        <div class="swb" data-c="#38bdf8" style="background:#38bdf8"></div>
+        <div class="swb" data-c="#f472b6" style="background:#f472b6"></div>
+      </div></div>
+    <div class="crow"><div class="clab">Glass blur<small>Softness of every card</small></div><input type="range" id="blurR" min="4" max="30" value="18"></div>
+    <div class="crow"><div class="clab">Card opacity<small>How much light passes through</small></div><input type="range" id="opR" min="3" max="18" value="7"></div>
+    <div class="crow"><div class="clab">Glow intensity<small>Aurora brightness</small></div><input type="range" id="glowR" min="15" max="95" value="55"></div>
+    <div class="crow"><div class="clab">Motion<small>Ambient animation</small></div><div class="tgl on" id="motT"></div></div>
+    <div class="crow"><div class="clab">Show statistics row</div><div class="tgl on" data-modtgl="stats"></div></div>
+    <div class="crow"><div class="clab">Show task board</div><div class="tgl on" data-modtgl="tasks"></div></div>
+    <div class="crow"><div class="clab">Show memory constellation</div><div class="tgl on" data-modtgl="memory"></div></div>
+    <div class="crow" style="border-bottom:0"><div class="clab">Show model router</div><div class="tgl on" data-modtgl="router"></div></div>
+    <div class="mfoot">Everything is configurable — preferences save automatically.</div>
+  </div>
+</div>
+<script>
+'use strict';
+var DEF={theme:'aurora',accent:'#a78bfa',blur:18,op:7,glow:55,motion:true,
+  mods:{stats:true,tasks:true,memory:true,router:true}};
+var cfg=load();
+function load(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('aura_cfg')||'{}'))}catch(e){return JSON.parse(JSON.stringify(DEF))}}
+function save(){localStorage.setItem('aura_cfg',JSON.stringify(cfg))}
+function hex2rgb(h){var n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255]}
+
+function apply(){
+  if(cfg.theme==='aurora')document.body.removeAttribute('data-theme');
+  else document.body.dataset.theme=cfg.theme;
+  var r=document.documentElement.style,rgb=hex2rgb(cfg.accent);
+  r.setProperty('--acc',cfg.accent);
+  r.setProperty('--accsoft','rgba('+rgb.join(',')+',.26)');
+  r.setProperty('--cardblur',cfg.blur+'px');
+  r.setProperty('--cardop',cfg.op/100);
+  r.setProperty('--blobop',cfg.glow/100);
+  var ps=cfg.motion?'running':'paused';
+  document.querySelectorAll('.blob,.pkt,.dot').forEach(function(el){el.style.animationPlayState=ps});
+  document.querySelectorAll('[data-mod]').forEach(function(el){
+    el.style.display=cfg.mods[el.dataset.mod]?'' :'none';});
+  syncUI();
+}
+function syncUI(){
+  document.querySelectorAll('.tbtn').forEach(function(b){b.classList.toggle('on',b.dataset.v===cfg.theme)});
+  document.querySelectorAll('.swb').forEach(function(s){s.classList.toggle('on',s.dataset.c===cfg.accent)});
+  blurR.value=cfg.blur;opR.value=cfg.op;glowR.value=cfg.glow;
+  motT.classList.toggle('on',cfg.motion);
+  document.querySelectorAll('[data-modtgl]').forEach(function(t){
+    t.classList.toggle('on',!!cfg.mods[t.dataset.modtgl])});
+}
+
+/* modal */
+var modal=document.getElementById('cfgModal');
+cfgFab.onclick=function(){modal.classList.add('open')};
+mx.onclick=function(){modal.classList.remove('open')};
+modal.addEventListener('click',function(e){if(e.target===modal)modal.classList.remove('open')});
+
+thBtns.querySelectorAll('.tbtn').forEach(function(b){
+  b.onclick=function(){cfg.theme=b.dataset.v;save();apply();};});
+acSw.querySelectorAll('.swb').forEach(function(s){
+  s.onclick=function(){cfg.accent=s.dataset.c;save();apply();};});
+blurR.oninput=function(e){cfg.blur=+e.target.value;save();apply()};
+opR.oninput=function(e){cfg.op=+e.target.value;save();apply()};
+glowR.oninput=function(e){cfg.glow=+e.target.value;save();apply()};
+motT.onclick=function(){cfg.motion=!cfg.motion;save();apply()};
+document.querySelectorAll('[data-modtgl]').forEach(function(t){
+  t.onclick=function(){var k=t.dataset.modtgl;cfg.mods[k]=!cfg.mods[k];save();apply()};});
+
+/* animated counters */
+function countUp(id,target,decimals,suffix){
+  var el=document.getElementById(id),start=null;
+  function step(ts){if(!start)start=ts;
+    var p=Math.min(1,(ts-start)/1400),e=1-Math.pow(1-p,3),v=target*e;
+    el.innerHTML=v.toFixed(decimals)+(suffix||'');
+    if(p<1)requestAnimationFrame(step);}
+  requestAnimationFrame(step);}
+countUp('s1',128,0);
+
+/* progress creep */
+var p1=64,p2=12;
+setInterval(function(){
+  p1=Math.min(97,p1+Math.random()*1.4);p2=Math.min(60,p2+Math.random()*0.9);
+  pb1.style.width=p1+'%';pb2.style.width=p2+'%';},2200);
+
+/* memory constellation canvas */
+var cv=document.getElementById('memcanvas'),cx=cv.getContext('2d');
+var nodes=[];for(var i=0;i<26;i++)nodes.push({
+  x:Math.random(),y:Math.random(),vx:(Math.random()-.5)*0.0016,vy:(Math.random()-.5)*0.0016,
+  r:1.6+Math.random()*2});
+cv.onclick=function(e){
+  var rect=cv.getBoundingClientRect(),mx=(e.clientX-rect.left)/rect.width,my=(e.clientY-rect.top)/rect.height;
+  nodes.forEach(function(n){var dx=n.x-mx,dy=n.y-my,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<0.12){n.vx+=dx*0.03;n.vy+=dy*0.03;}});};
+function draw(){
+  var W=cv.width=cv.offsetWidth*devicePixelRatio,H=cv.height=cv.offsetHeight*devicePixelRatio;
+  cx.clearRect(0,0,W,H);
+  var rgb=hex2rgb(cfg.accent);
+  nodes.forEach(function(n){
+    n.x+=n.vx;n.y+=n.vy;
+    if(n.x<0||n.x>1)n.vx*=-1;if(n.y<0||n.y>1)n.vy*=-1;});
+  cx.lineWidth=devicePixelRatio;
+  for(var a=0;a<nodes.length;a++)for(var b=a+1;b<nodes.length;b++){
+    var dx=nodes[a].x-nodes[b].x,dy=nodes[a].y-nodes[b].y,d=dx*dx+dy*dy;
+    if(d<0.013){cx.strokeStyle='rgba('+rgb.join(',')+','+(0.34*(1-d/0.013))+')';
+      cx.beginPath();cx.moveTo(nodes[a].x*W,nodes[a].y*H);
+      cx.lineTo(nodes[b].x*W,nodes[b].y*H);cx.stroke();}}
+  nodes.forEach(function(n){
+    cx.fillStyle='rgba('+rgb.join(',')+',.9)';
+    cx.beginPath();cx.arc(n.x*W,n.y*H,n.r*devicePixelRatio,0,7);cx.fill();});
+  requestAnimationFrame(draw);}
+draw();
+
+/* router drift */
+var lp=64,sv=3.87;
+setInterval(function(){
+  lp=Math.max(44,Math.min(76,lp+(Math.random()*10-5)));
+  rl.textContent=Math.round(lp)+'%';rf.textContent=Math.round(100-lp)+'%';
+  sv+=0.01+Math.random()*0.04;rsave.textContent='$'+sv.toFixed(2);},3500);
+
+/* greeting by hour */
+(function(){var h=new Date().getHours(),g=h<5?'Good night':h<12?'Good morning':h<18?'Good afternoon':'Good evening';
+  document.querySelector('h1').textContent=g+', Elias';})();
+
+apply();
+
+</script>
+</body>
+
+</html>

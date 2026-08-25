@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FUSION · Aurum Edition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --acc:#c8a24b;
+  --ink:#ebe6da;--mut:#8f887b;--rule:#2a2531;
+  --bg:#0f0d13;--glass:rgba(255,255,255,.055);--gborder:rgba(255,255,255,.13);
+  --good:#57c99b;--warn:#e0b45a;--bad:#ff7373;
+  --blur:16px;--blobop:.4;--gap:16px;
+  --serif:ui-serif,Georgia,'Times New Roman',serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);font-size:15px;min-height:100vh;overflow-x:hidden}
+body[data-theme=sepia]{--bg:#f1ece1;--ink:#211c14;--mut:#7d7566;--rule:#d5cdbb;
+  --glass:rgba(255,255,255,.55);--gborder:rgba(30,25,15,.15);--acc:#a4762a}
+body[data-theme=slate]{--bg:#141922;--ink:#e3e8ef;--mut:#8792a1;--rule:#2b3340;--acc:#7fb2e0}
+
+/* ── ATMOSFARE (Aura) + GITRE (Nexus) ────── */
+.blobs{position:fixed;inset:0;z-index:-2;filter:blur(90px);opacity:var(--blobop)}
+.blob{position:absolute;border-radius:50%;width:44vw;height:44vw;animation:float 28s ease-in-out infinite alternate}
+.b1{background:#5b3fa8;top:-12%;left:-6%}
+.b2{background:#0e5a63;top:22%;right:-10%;animation-delay:-9s}
+.b3{background:#7a2740;bottom:-16%;left:26%;animation-delay:-17s}
+@keyframes float{to{transform:translate(56px,40px) scale(1.09)}}
+.grid-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.1;
+  background-image:linear-gradient(var(--rule) 1px,transparent 1px),
+    linear-gradient(90deg,var(--rule) 1px,transparent 1px);background-size:46px 46px}
+.grid-bg.off{display:none}
+.scan{position:fixed;inset:0;pointer-events:none;z-index:70;
+  background:repeating-linear-gradient(0deg,rgba(127,127,127,.03) 0 1px,transparent 1px 3px)}
+.scan.off{display:none}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--rule);border-radius:5px}
+
+/* ── GLAS (Aura-form, dæmpet) ────────────── */
+.glass{background:var(--glass);backdrop-filter:blur(var(--blur)) saturate(140%);
+  -webkit-backdrop-filter:blur(var(--blur)) saturate(140%);
+  border:1px solid var(--gborder);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.22)}
+.wrap{max-width:1280px;margin:0 auto;padding:26px 26px 80px;position:relative;z-index:1}
+
+/* ── MASTHEAD (Atlas) ────────────────────── */
+.rule-double{border-top:2.5px solid var(--ink);border-bottom:1px solid var(--ink);height:5px}
+.mast-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0 10px}
+.mast-title{font-size:34px;letter-spacing:.32em;font-weight:600;text-indent:.32em}
+.mast-title span{color:var(--acc);text-shadow:0 0 22px color-mix(in srgb,var(--acc) 60%,transparent)}
+.edition{font-family:var(--mono);font-size:10px;letter-spacing:.34em;color:var(--mut);
+  border:1px solid var(--gborder);padding:4px 11px;border-radius:99px}
+.mast-right{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+.bmeter{width:86px;height:5px;border:1px solid var(--gborder)}
+.bmeter i{display:block;height:100%;background:var(--acc);transition:width .6s}
+.gate-badge{padding:4px 12px;border:1px solid var(--acc);color:var(--acc);letter-spacing:.13em;
+  cursor:pointer;background:none;font-family:var(--mono);font-size:10.5px;border-radius:99px}
+.gate-badge:hover{background:var(--acc);color:var(--bg)}
+.fab{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;cursor:pointer;
+  font-size:19px;transition:.35s cubic-bezier(.34,1.56,.64,1)}
+.fab:hover{transform:rotate(50deg) scale(1.07);border-color:var(--acc)}
+
+/* ── SEKTIONSNAV (Atlas) ─────────────────── */
+.secnav{display:flex;flex-wrap:wrap;gap:4px;margin:16px 0 22px;border-top:1px solid var(--rule);
+  border-bottom:1px solid var(--rule);padding:8px 0}
+.navbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  background:none;border:0;color:var(--mut);padding:8px 14px;cursor:pointer;border-radius:99px;transition:.2s}
+.navbtn:hover{color:var(--ink)}
+.navbtn.on{color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 45%,transparent)}
+<style>
+/* ── HERO STATS ──────────────────────────── */
+.hero{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:18px}
+.hero h1{font-size:26px;font-weight:550;font-style:italic}
+.hero .sub2{font-family:var(--mono);font-size:11px;color:var(--mut);letter-spacing:.08em}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);margin-bottom:var(--gap)}
+.stat{padding:16px 20px}
+.stat .num{font-size:26px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .num em{font-style:normal;font-size:13px;opacity:.55}
+.stat .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--mut);
+  text-transform:uppercase;margin-top:5px}
+
+/* ── MAIN GRID ───────────────────────────── */
+.main3{display:grid;grid-template-columns:1.05fr 1.25fr .95fr;gap:var(--gap);align-items:start}
+.colv{display:flex;flex-direction:column;gap:var(--gap)}
+.card{padding:20px}
+h3.ct{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--mut);
+  font-weight:500;display:flex;align-items:center;gap:9px;margin-bottom:15px;
+  font-family:var(--mono)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good);margin-left:auto;animation:pulse 1.6s infinite}
+@keyframes pulse{50%{box-shadow:0 0 10px currentColor}}
+
+/* plan-træ (Atlas-serif på glas) */
+.node{display:flex;align-items:baseline;gap:11px;padding:8px 0;border-bottom:1px dotted var(--rule);font-size:14.5px}
+.node:last-child{border-bottom:0}
+.node[data-depth="1"]{padding-left:30px}
+.node .mk{width:14px;text-align:center;font-family:var(--mono);font-size:12px;flex-shrink:0}
+.node .ti{flex:1;line-height:1.4}
+.node .st{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase}
+.node.done .mk{color:var(--good)}.node.done .st{color:var(--mut)}
+.node.done .ti{color:var(--mut);text-decoration:line-through;text-decoration-color:var(--rule)}
+.node.running .mk,.node.running .st{color:var(--acc)}
+.node.blocked .mk,.node.blocked .st{color:var(--warn)}
+.mk.spin{display:inline-block;animation:rot 1.2s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* telemetri (Nexus-mono) */
+#console{height:300px;overflow-y:auto;font-family:var(--mono);font-size:12px;line-height:1.75;padding-right:6px}
+.ln{white-space:pre-wrap;word-break:break-word;animation:fadein .3s}
+.ln .t{color:var(--mut)}
+.tag{padding:1px 7px;border:1px solid;margin-right:8px;font-size:10px;border-radius:3px}
+.tg-tool{color:var(--warn);border-color:var(--warn)}
+.tg-ok{color:var(--good);border-color:var(--good)}
+.tg-route{color:#b48cff;border-color:#b48cff}
+.tg-mem{color:#7fb8e0;border-color:#7fb8e0}
+.tg-sec{color:var(--bad);border-color:var(--bad)}
+.tg-fold{color:#e88ab8;border-color:#e88ab8}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}}
+
+/* router */
+.lab2{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--mut);margin-bottom:6px}
+.lane2{position:relative;height:24px;border-radius:99px;background:rgba(127,127,127,.1);
+  border:1px solid var(--gborder);margin-bottom:14px;overflow:hidden}
+.pkt{position:absolute;top:50%;margin-top:-4px;width:8px;height:8px;border-radius:50%;
+  background:var(--acc);box-shadow:0 0 12px var(--acc);animation:flow var(--fd,3.2s) linear infinite}
+@keyframes flow{from{left:-10px}to{left:100%}}
+.route-sum{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;color:var(--mut)}
+.route-sum b{color:var(--good);font-weight:500}
+<style>
+/* højre kolonne */
+.ringwrap{display:flex;gap:15px;align-items:center;margin-bottom:8px}
+.ringwrap svg{transform:rotate(-90deg)}
+.track{fill:none;stroke:rgba(127,127,127,.18);stroke-width:7}
+.prog{fill:none;stroke:var(--acc);stroke-width:7;stroke-linecap:round;stroke-dasharray:283;transition:stroke-dashoffset 1s}
+.ringpct{font-size:21px;font-weight:600}
+.ringlab{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;color:var(--mut);text-transform:uppercase;margin-top:3px}
+.memrow{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px dotted var(--rule)}
+.memrow b{color:var(--acc);font-weight:500;font-variant-numeric:tabular-nums}
+.crit{list-style:none}
+.crit li{display:flex;gap:9px;font-size:13px;padding:7px 0;border-bottom:1px dotted var(--rule);
+  line-height:1.45;animation:fadein .4s}
+.crit .st{margin-left:auto;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;flex-shrink:0;padding-top:2px}
+.st.pass{color:var(--good)}.st.fail{color:var(--bad)}
+
+/* statusbar · palette · toast · modal */
+.statusbar{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:blur(10px);border-top:1px solid var(--rule);z-index:40}
+.statusbar .inner{max-width:1280px;margin:0 auto;padding:7px 26px;display:flex;gap:16px;
+  align-items:center;font-family:var(--mono);font-size:10px;color:var(--mut)}
+.chip b{color:var(--acc);font-weight:500;margin-right:5px}
+.sb-right{margin-left:auto;display:flex;gap:16px}
+kbd{border:1px solid var(--gborder);border-radius:4px;padding:1px 7px;font-family:var(--mono);font-size:10px;box-shadow:0 2px 0 var(--gborder)}
+.pal-ov{position:fixed;inset:0;background:rgba(5,5,10,.45);backdrop-filter:blur(5px);z-index:90;
+  display:none;justify-content:center;padding-top:11vh}
+.pal-ov.open{display:flex}
+.pal{width:min(600px,92vw);height:fit-content;background:var(--bg);border:1px solid var(--ink);
+  box-shadow:10px 10px 0 rgba(0,0,0,.25);animation:palin .16s ease-out;border-radius:12px;overflow:hidden}
+@keyframes palin{from{transform:translateY(-8px);opacity:0}}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--rule);background:transparent;
+  padding:15px 18px;font-family:var(--serif);font-size:17px;color:var(--ink);outline:none}
+.pal ul{list-style:none;max-height:330px;overflow-y:auto}
+.pal li{display:flex;justify-content:space-between;padding:10px 18px;cursor:pointer;
+  font-size:14.5px;border-bottom:1px dotted var(--rule)}
+.pal li .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.pal li.sel{background:var(--acc);color:var(--bg)}.pal li.sel .cat{color:inherit;opacity:.7}
+.toast{position:fixed;bottom:46px;left:50%;transform:translateX(-50%) translateY(90px);
+  background:var(--ink);color:var(--bg);font-family:var(--mono);font-size:12px;
+  padding:11px 22px;z-index:99;transition:transform .3s;border-radius:8px}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.modal{position:fixed;inset:0;display:none;place-items:center;z-index:80;
+  background:rgba(5,5,10,.5);backdrop-filter:blur(6px)}
+.modal.open{display:grid}
+.modal .glass{width:min(480px,92vw);padding:26px;max-height:86vh;overflow-y:auto;animation:palin .3s cubic-bezier(.34,1.56,.64,1)}
+.mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.mhead h2{font-size:19px;font-weight:600}
+.xbtn{cursor:pointer;font-size:17px;opacity:.6;background:none;border:0;color:inherit}
+.crow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;
+  border-bottom:1px dotted var(--rule);font-size:14px}
+.crow small{display:block;font-size:11.5px;color:var(--mut);margin-top:2px;font-style:italic}
+input[type=range]{accent-color:var(--acc);width:140px}
+.themebtns,.swatches{display:flex;gap:8px}
+.tbtn{font-family:var(--mono);font-size:11px;padding:7px 14px;border-radius:99px;cursor:pointer;
+  background:none;border:1px solid var(--gborder);color:inherit}
+.tbtn.on{border-color:var(--acc);color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.swb{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent}
+.swb.on{border-color:var(--ink);transform:scale(1.12)}
+.tgl{width:42px;height:24px;border-radius:99px;background:rgba(127,127,127,.3);position:relative;cursor:pointer;flex-shrink:0}
+.tgl::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#888;transition:.2s}
+.tgl.on{background:var(--acc)}.tgl.on::after{left:21px;background:var(--bg)}
+@media(max-width:1080px){.main3{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="blobs"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div></div>
+<div class="grid-bg"></div>
+<div class="scan"></div>
+<div class="toast" id="toast"></div>
+
+<div class="pal-ov" id="palOv">
+  <div class="pal">
+    <input id="palIn" placeholder="Switch theme, gates, accent…" autocomplete="off"/>
+    <ul id="palList"></ul>
+    <div class="pfoot">↑↓ navigate · ↵ run · esc close</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header>
+    <div class="rule-double"></div>
+    <div class="mast-row">
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="mast-title">ATL<span>A</span>S</div>
+        <span class="edition">FUSION · AURUM EDITION</span>
+      </div>
+      <div class="mast-right">
+        <span>BUDGET</span><span class="bmeter"><i id="budBar" style="width:35%"></i></span><span id="budTxt">$4.20/$12</span>
+        <button class="gate-badge" id="gateBadge">GATES · STRICT</button>
+        <span id="clock2">00:00:00</span>
+        <button class="glass fab" id="cfgFab">⚙</button>
+      </div>
+    </div>
+    <nav class="secnav">
+      <button class="navbtn on">Overview</button>
+      <button class="navbtn">Plans &amp; Tasks</button>
+      <button class="navbtn">Memory</button>
+      <button class="navbtn">Verification</button>
+      <button class="navbtn">Economy</button>
+      <button class="navbtn">Security</button>
+      <button class="navbtn">Sessions</button>
+    </nav>
+  </header>
+
+  <section class="stats">
+    <div class="glass stat"><div class="num">128</div><div class="cap">Tasks · +6 today</div></div>
+    <div class="glass stat"><div class="num">41<em> MB</em></div><div class="cap">Context folded losslessly</div></div>
+    <div class="glass stat"><div class="num">98.4<em>%</em></div><div class="cap">Verify pass-rate</div></div>
+    <div class="glass stat"><div class="num">$3.87</div><div class="cap">Saved by routing today</div></div>
+  </section>
+
+  <div class="main3">
+    <div class="colv">
+      <div class="glass card">
+        <h3 class="ct">PLAN №7 <b style="color:var(--acc)">·</b> MIGRATE AUTH PROVIDER</h3>
+        <div id="tree"></div>
+      </div>
+      <div class="glass card">
+        <h3 class="ct">MODEL ROUTER</h3>
+        <div class="lab2"><span>LOCAL · 8B — easy steps</span><span id="rl">62%</span></div>
+        <div class="lane2"><div class="pkt" style="--fd:2.7s"></div></div>
+        <div class="lab2"><span>FRONTIER — hard reasoning</span><span id="rf">38%</span></div>
+        <div class="lane2"><div class="pkt" style="--fd:4.4s;animation-delay:-1.6s"></div><div class="pkt" style="--fd:5.6s;animation-delay:-.9s;filter:hue-rotate(40deg)"></div></div>
+        <div class="route-sum"><span>Cascade routing active</span><span>Saved: <b>$3.87</b></span></div>
+      </div>
+    </div>
+
+    <div class="colv">
+      <div class="glass card">
+        <h3 class="ct">LIVE TELEMETRY <span class="dot"></span></h3>
+        <div id="console"></div>
+      </div>
+      <div class="glass card">
+        <h3 class="ct">COST LEDGER <b style="color:var(--acc)">·</b> LIVE</h3>
+        <table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px">
+          <thead><tr>
+            <th style="text-align:left;padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">TIME</th>
+            <th style="text-align:left;padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">STEP</th>
+            <th style="text-align:left;padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">MODEL</th>
+            <th style="text-align:right;padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">TOK</th>
+            <th style="text-align:right;padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">COST</th>
+          </tr></thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="colv">
+      <div class="glass card">
+        <h3 class="ct">MEMORY CORE</h3>
+        <div class="ringwrap">
+          <svg width="92" height="92" viewBox="0 0 100 100">
+            <circle class="track" cx="50" cy="50" r="45"/>
+            <circle class="prog" id="memRing" cx="50" cy="50" r="45" style="stroke-dashoffset:94"/>
+          </svg>
+          <div><div class="ringpct" id="memPct">67%</div><div class="ringlab">Recall hit-rate</div></div>
+        </div>
+        <div class="memrow"><span>Episodes</span><b id="epis">1.284</b></div>
+        <div class="memrow"><span>Semantic facts</span><b>312</b></div>
+        <div class="memrow"><span>Folds rehydrated</span><b id="folds">47</b></div>
+      </div>
+      <div class="glass card">
+        <h3 class="ct">VERIFY GATE</h3>
+        <ul class="crit" id="crit"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+<footer class="statusbar"><div class="inner">
+  <span class="chip"><b>CAPS</b></span><span id="sbCaps"></span>
+  <span class="sb-right">
+    <span class="chip">2 background jobs</span>
+    <span class="chip" style="cursor:pointer" id="sbPal"><kbd>⌘K</kbd></span>
+  </span>
+</div></footer>
+
+<div class="modal" id="cfgModal">
+  <div class="glass">
+    <div class="mhead"><h2>Customization</h2><button class="xbtn" id="mx">✕</button></div>
+    <div class="crow"><div>Atmosphere<small>Atlas' paper meets the dark</small></div>
+      <div class="themebtns" id="thBtns">
+        <button class="tbtn on" data-v="nocturne">Nocturne</button>
+        <button class="tbtn" data-v="sepia">Sepia</button>
+        <button class="tbtn" data-v="slate">Slate</button>
+      </div></div>
+    <div class="crow"><div>Accent<small>Gold by default — pick your own</small></div>
+      <div class="swatches" id="acSw">
+        <div class="swb on" data-c="#c8a24b" style="background:#c8a24b"></div>
+        <div class="swb" data-c="#b5301c" style="background:#b5301c"></div>
+        <div class="swb" data-c="#22d3ee" style="background:#22d3ee"></div>
+        <div class="swb" data-c="#57c99b" style="background:#57c99b"></div>
+        <div class="swb" data-c="#a78bfa" style="background:#a78bfa"></div>
+      </div></div>
+    <div class="crow"><div>Glass blur<small>Aura's softness</small></div><input type="range" id="blurR" min="0" max="30" value="16"></div>
+    <div class="crow"><div>Aurora glow<small>How much atmosphere</small></div><input type="range" id="glowR" min="0" max="80" value="40"></div>
+    <div class="crow"><div>Background grid<small>Nexus' technical transparency</small></div><div class="tgl on" id="gridT"></div></div>
+    <div class="crow"><div>Scanlines<small>CRT nostalgia</small></div><div class="tgl on" id="scanT"></div></div>
+    <div class="crow" style="border-bottom:0"><div>Motion<small>Ambient animations</small></div><div class="tgl on" id="motT"></div></div>
+  </div>
+</div>
+<script>
+'use strict';
+/* ── config ──────────────────────────────── */
+var DEF={theme:'nocturne',accent:'#c8a24b',blur:16,glow:40,grid:true,scan:true,motion:true,gates:'strict'};
+var cfg=load();
+function load(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('fusion_cfg')||'{}'))}catch(e){return JSON.parse(JSON.stringify(DEF))}}
+function save(){localStorage.setItem('fusion_cfg',JSON.stringify(cfg))}
+function hex2rgb(h){var n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255]}
+
+function apply(){
+  if(cfg.theme==='nocturne')document.body.removeAttribute('data-theme');
+  else document.body.dataset.theme=cfg.theme;
+  var r=document.documentElement.style;
+  r.setProperty('--acc',cfg.accent);
+  r.setProperty('--blur',cfg.blur+'px');
+  r.setProperty('--blobop',cfg.glow/100);
+  document.querySelector('.grid-bg').classList.toggle('off',!cfg.grid);
+  document.querySelector('.scan').classList.toggle('off',!cfg.scan);
+  var ps=cfg.motion?'running':'paused';
+  document.querySelectorAll('.blob,.pkt,.dot,.mk.spin').forEach(function(el){el.style.animationPlayState=ps});
+  gateBadge.textContent='GATES · '+cfg.gates.toUpperCase();
+  syncUI();
+}
+function syncUI(){
+  document.querySelectorAll('.tbtn').forEach(function(b){b.classList.toggle('on',b.dataset.v===cfg.theme)});
+  document.querySelectorAll('.swb').forEach(function(s){s.classList.toggle('on',s.dataset.c===cfg.accent)});
+  blurR.value=cfg.blur;glowR.value=cfg.glow;
+  gridT.classList.toggle('on',cfg.grid);
+  scanT.classList.toggle('on',cfg.scan);
+  motT.classList.toggle('on',cfg.motion);
+}
+
+/* ── modal & kontroller ──────────────────── */
+var modal=document.getElementById('cfgModal');
+cfgFab.onclick=function(){modal.classList.add('open')};
+mx.onclick=function(){modal.classList.remove('open')};
+modal.addEventListener('click',function(e){if(e.target===modal)modal.classList.remove('open')});
+thBtns.querySelectorAll('.tbtn').forEach(function(b){
+  b.onclick=function(){cfg.theme=b.dataset.v;save();apply()}});
+acSw.querySelectorAll('.swb').forEach(function(s){
+  s.onclick=function(){cfg.accent=s.dataset.c;save();apply()}});
+blurR.oninput=function(e){cfg.blur=+e.target.value;save();apply()};
+glowR.oninput=function(e){cfg.glow=+e.target.value;save();apply()};
+gridT.onclick=function(){cfg.grid=!cfg.grid;save();apply()};
+scanT.onclick=function(){cfg.scan=!cfg.scan;save();apply()};
+motT.onclick=function(){cfg.motion=!cfg.motion;save();apply()};
+gateBadge.onclick=cycleGates;
+function cycleGates(){var o=['strict','advisory','draft'];
+  cfg.gates=o[(o.indexOf(cfg.gates)+1)%3];save();apply();
+  toast('Verify gates: '+cfg.gates.toUpperCase());}
+document.querySelectorAll('.navbtn').forEach(function(b){
+  b.onclick=function(){document.querySelectorAll('.navbtn').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');toast(b.textContent+' — stub in this mockup')};});
+
+/* ── plan-træ ────────────────────────────── */
+var TREE=[
+ {d:0,t:'Audit existing session middleware',s:'done'},
+ {d:1,t:'Map token validation call-sites',s:'done'},
+ {d:0,t:'Implement OIDC authorization-code flow',s:'running'},
+ {d:1,t:'Callback endpoint + state nonce',s:'running'},
+ {d:1,t:'Refresh-token rotation service',s:'blocked'},
+ {d:0,t:'Chaos drill: rollback in under 60s',s:'pending'}];
+var MK={done:'✓',running:'◈',blocked:'▮',pending:'·'};
+function renderTree(){tree.innerHTML=TREE.map(function(n){
+  return '<div class="node '+n.s+'" data-depth="'+n.d+'">'+
+   '<span class="mk'+(n.s==='running'?' spin':'')+'">'+MK[n.s]+'</span>'+
+   '<span class="ti">'+n.t+'</span><span class="st">'+n.s+'</span></div>';}).join('');}
+renderTree();
+setInterval(function(){
+  var i=TREE.findIndex(function(n){return n.s==='running'});
+  if(i>-1&&Math.random()<0.45)TREE[i].s='done';
+  else{var p=TREE.findIndex(function(n){return n.s==='pending'||n.s==='blocked'});
+    if(p>-1)TREE[p].s='running';}
+  renderTree();},5400);
+
+/* ── telemetri ───────────────────────────── */
+var LINES=[
+ ['tg-mem','memory.write → episodic store ("user prefers compact diffs")'],
+ ['tg-route','router.score(0.21) → LOCAL-8B · saved $0.041'],
+ ['tg-tool','$ git diff --stat HEAD~1','14 files changed, 812 insertions(+)'],
+ ['tg-fold','context fold #12 · 9.4k tokens → folds/0012.idx (lossless)'],
+ ['tg-ok','verify: pytest tests/auth -q … 47 passed in 3.82s'],
+ ['tg-sec','capability check → shell denied outside sandbox'],
+ ['tg-tool','$ rg "sessionMiddleware" src/ -l','11 matches in 6 files'],
+ ['tg-route','router.score(0.83) → FRONTIER · escalation justified'],
+ ['tg-ok','critic-v0 verified claim against 3 sources'],
+ ['tg-mem','consolidation: 7 duplicates → semantic fact #218'],
+ ['tg-fold','rehydrate folds/0008.idx → 6.1k tokens restored on demand'],
+ ['tg-ok','plan ledger synced · step 7.3 done'],
+ ['tg-sec','taint scan → 0 untrusted flows into tool calls']];
+var conEl=document.getElementById('console');
+function push(){var L=LINES[Math.floor(Math.random()*LINES.length)],now=new Date();
+  var d=document.createElement('div');d.className='ln';
+  var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  d.innerHTML='<span class="t">'+t+'</span> ';
+  var tag=document.createElement('span');tag.className='tag '+L[0];tag.textContent=L[0].slice(3);
+  d.appendChild(tag);d.appendChild(document.createTextNode(L[1]+((L[2])?'\n           '+L[2]:'')));
+  conEl.appendChild(d);
+  while(conEl.children.length>60)conEl.removeChild(conEl.firstChild);
+  conEl.scrollTop=conEl.scrollHeight;}
+function loopPush(){push();setTimeout(loopPush,1500);}
+/* ── cost ledger ─────────────────────────── */
+var STEPS=['plan','retrieve','impl:oidc-callback','fold ctx','route→local','impl:refresh','tests:e2e','verify:gate','critic review'];
+var totCost=0;
+function ledgerRow(){
+  var model=Math.random()<0.62?'LOCAL-8B':'FRONTIER';
+  var tk=model==='LOCAL-8B'?800+Math.floor(Math.random()*2500):3000+Math.floor(Math.random()*9000);
+  var cost=model==='LOCAL-8B'?tk*0.0000006:tk*0.000009;totCost+=cost;
+  var t=new Date(),hh=String(t.getHours()).padStart(2,'0'),mm=String(t.getMinutes()).padStart(2,'0'),ss=String(t.getSeconds()).padStart(2,'0');
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td style="padding:6px 8px;color:var(--mut)">'+hh+':'+mm+':'+ss+'</td>'+
+   '<td style="padding:6px 8px">'+STEPS[Math.floor(Math.random()*STEPS.length)]+'</td>'+
+   '<td style="padding:6px 8px;color:'+(model==='LOCAL-8B'?'var(--mut)':'var(--acc)')+'">'+model+'</td>'+
+   '<td style="padding:6px 8px;text-align:right">'+tk.toLocaleString('en-US')+'</td>'+
+   '<td style="padding:6px 8px;text-align:right">$'+cost.toFixed(4)+'</td>';
+  var tot=document.getElementById('tCost');
+  if(!tot){
+    var tr2=document.createElement('tr');tr2.id='totRow';
+    tr2.innerHTML='<td colspan="4" style="padding:7px 8px;border-top:1px solid var(--ink);font-weight:600">TOTAL</td>'+
+      '<td id="tCost" style="text-align:right;border-top:1px solid var(--ink);font-weight:600"></td>';
+    ledgerBody.appendChild(tr2);}
+  else{
+    var tr0=tot.parentElement;ledgerBody.insertBefore(tr,tr0);}
+  document.getElementById('tCost').textContent='$'+totCost.toFixed(3);
+  while(ledgerBody.querySelectorAll('tr:not(#totRow)').length>7)
+    ledgerBody.removeChild(ledgerBody.querySelector('tr:not(#totRow)'));}
+/* ── verify gate ─────────────────────────── */
+var CRITS=[['47 legacy sessions survive migration','tests:int'],
+ ['No secrets logged above DEBUG','sec-scan'],
+ ['Rollback within ≤60s (measured)','chaos-drill'],
+ ['Critic approves — no regressions','critic-v0']];
+var ci=0;
+function addCrit(){if(ci>=CRIT.length)return;
+  var ok=Math.random()>0.15,li=document.createElement('li');
+  li.innerHTML='<span style="color:'+(ok?'var(--good)':'var(--bad)')+'">'+(ok?'✓':'✗')+'</span><span>'+CRITS[ci][0]+'</span>'+
+   '<span class="st '+(ok?'pass':'fail')+'">'+(ok?'PASS':'RETRY')+' · '+CRITS[ci][1]+'</span>';
+  crit.appendChild(li);ci++;}
+setTimeout(addCrit,800);setInterval(addCrit,4200);
+
+/* ── memory ring & router drift ──────────── */
+var pct=67,episN=1284,foldsN=47;
+setInterval(function(){pct=Math.max(52,Math.min(88,pct+(Math.random()*6-3)));
+  memPct.textContent=Math.round(pct)+'%';
+  memRing.style.strokeDashoffset=283-(283*pct/100);},5000);
+var lp=62;
+setInterval(function(){
+  lp=Math.max(44,Math.min(76,lp+(Math.random()*10-5)));
+  rl.textContent=Math.round(lp)+'%';rf.textContent=Math.round(100-lp)+'%';},4000);
+setInterval(function(){episN+=Math.floor(Math.random()*3);foldsN+=Math.random()<0.3?1:0;
+  epis.textContent=episN.toLocaleString('da-DK');folds.textContent=foldsN;},6000);
+
+/* ── statusbar grants ────────────────────── */
+var CAPS=[['fs:read','~/projects',900],['net:get','api.github.com',600],['shell:sandbox','µVM',1500]];
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+CAPS.forEach(function(c){var sp=document.createElement('span');sp.className='chip';
+  sp.innerHTML='<b>'+c[0]+'</b>'+fmt(c[2]);c.sp=sp;sbCaps.appendChild(sp);});
+setInterval(function(){CAPS.forEach(function(c){c[2]--;
+  c.sp.innerHTML='<b>'+c[0]+'</b>'+fmt(c[2]);});},1000);
+
+/* ── palette ─────────────────────────────── */
+var CMDS=[
+ {n:'Theme — Nocturne',c:'udseende',f:function(){cfg.theme='nocturne';done('Nocturne')}},
+ {n:'Theme — Sepia',c:'udseende',f:function(){cfg.theme='sepia';done('Sepia')}},
+ {n:'Theme — Slate',c:'udseende',f:function(){cfg.theme='slate';done('Slate')}},
+ {n:'Accent — Aurum',c:'udseende',f:function(){cfg.accent='#c8a24b';done('Aurum-accent')}},
+ {n:'Accent — Crimson',c:'udseende',f:function(){cfg.accent='#b5301c';done('Crimson-accent')}},
+ {n:'Accent — Cyan',c:'udseende',f:function(){cfg.accent='#22d3ee';done('Cyan-accent')}},
+ {n:'Gates — Strict',c:'verifikation',f:function(){cfg.gates='strict';done('Gates: STRICT')}},
+ {n:'Gates — Advisory',c:'verifikation',f:function(){cfg.gates='advisory';done('Gates: ADVISORY')}},
+ {n:'Gates — Draft',c:'verifikation',f:function(){cfg.gates='draft';done('Gates: DRAFT')}},
+ {n:'Turn off scanlines',c:'udseende',f:function(){cfg.scan=false;save();apply();closePal();toast('Scanlines off')}},
+ {n:'Export configuration (JSON)',c:'system',f:function(){
+    var j=JSON.stringify(cfg,null,2);
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(j).then(function(){done('Copied!')},function(){done(j)});
+    else done(j);}}];
+var sel=0,filtered=CMDS;
+function done(msg){save();apply();closePal();toast(msg)}
+function openPal(){palOv.classList.add('open');palIn.value='';filter();palIn.focus()}
+function closePal(){palOv.classList.remove('open')}
+function filter(){var q=palIn.value.toLowerCase();
+  filtered=CMDS.filter(function(c){return c.n.toLowerCase().indexOf(q)>-1});
+  sel=0;renderPal();}
+function renderPal(){
+  palList.innerHTML=filtered.map(function(c,i){
+    return '<li data-i="'+i+'" class="'+(i===sel?'sel':'')+'"><span>'+c.n+'</span><span class="cat">'+c.c+'</span></li>';}).join('')
+    ||'<li><span style="color:var(--mut)">Ingen match</span></li>';
+  palList.querySelectorAll('li[data-i]').forEach(function(li){
+    li.onclick=function(){filtered[+li.dataset.i].f()};});
+  var s=palList.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});}
+palIn.oninput=filter;
+palIn.onkeydown=function(e){
+  if(e.key==='ArrowDown'){sel=Math.min(filtered.length-1,sel+1);renderPal();e.preventDefault();}
+  else if(e.key==='ArrowUp'){sel=Math.max(0,sel-1);renderPal();e.preventDefault();}
+  else if(e.key==='Enter'&&filtered[sel])filtered[sel].f();};
+palOv.addEventListener('click',function(e){if(e.target===palOv)closePal()});
+document.addEventListener('keydown',function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();
+    palOv.classList.contains('open')?closePal():openPal();}
+  else if(e.key==='Escape')closePal();});
+sbPal.onclick=openPal;
+
+/* ── toast & ur & init ───────────────────── */
+var toastTimer=null;
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show')},2200);}
+var sec=0;
+setInterval(function(){sec++;
+  clock2.textContent=String(Math.floor(sec/3600)).padStart(2,'0')+':'+
+    String(Math.floor(sec/60)%60).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');},1000);
+
+apply();
+for(var q=0;q<4;q++)push();
+ledgerRow();loopPush();
+
+</script>
+
+</body>
+</html>
+</html>

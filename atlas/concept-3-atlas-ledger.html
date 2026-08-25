@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ATLAS · Agent Operations Ledger</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --paper:#f6f4ee;--ink:#191712;--mut:#7a756a;--rule:#d9d3c6;--rule2:#b9b2a2;
+  --acc:#b5301c;--good:#2e6b46;--warn:#9a6a00;
+  --serif:ui-serif,Georgia,'Times New Roman',serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --pad:26px;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:15px;
+  min-height:100vh;transition:background .25s,color .25s}
+body[data-theme=slate]{--paper:#242830;--ink:#e8eaee;--mut:#9aa2ad;--rule:#3a4048;--rule2:#4c545e;--acc:#e05a3a}
+body[data-theme=noir]{--paper:#111110;--ink:#edece8;--mut:#8b897f;--rule:#2c2b27;--rule2:#3e3d37}
+body[data-density=compact]{--pad:16px;font-size:14px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 32px 70px}
+
+/* ── MASTHEAD ────────────────────────────── */
+.masthead{padding-top:34px}
+.rule-double{border-top:2.5px solid var(--ink);border-bottom:1px solid var(--ink);height:5px}
+.mast-row{display:flex;justify-content:space-between;align-items:baseline;padding:14px 0 10px}
+.mast-title{font-size:44px;letter-spacing:.34em;font-weight:600;text-indent:.34em}
+.mast-title span{color:var(--acc)}
+.mast-sub{text-align:center;font-style:italic;color:var(--mut);font-size:14px;padding-bottom:12px}
+.mast-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;
+  color:var(--mut);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:8px 2px;letter-spacing:.06em;text-transform:uppercase}
+.mast-meta b{color:var(--ink);font-weight:500}
+.gate-badge{padding:2px 10px;border:1px solid var(--acc);color:var(--acc);letter-spacing:.12em}
+
+/* ── MAIN GRID ───────────────────────────── */
+.maingrid{display:grid;grid-template-columns:1.15fr 1fr;margin-top:8px}
+.colL{border-right:1px solid var(--rule);padding:26px 30px 26px 2px}
+.colR{padding:26px 2px 26px 30px}
+.sec-head{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;
+  color:var(--mut);display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.sec-head b{color:var(--acc);font-weight:500}
+
+/* ── PLAN TREE ───────────────────────────── */
+.node{display:flex;align-items:baseline;gap:12px;padding:9px 0;font-size:15px;
+  border-bottom:1px dotted var(--rule)}
+.node .mk{width:16px;text-align:center;flex-shrink:0;font-size:12px}
+.node .id{font-family:var(--mono);font-size:11px;color:var(--mut);flex-shrink:0;width:34px}
+.node .ti{flex:1}
+.node .st{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase}
+.node[data-depth="1"]{padding-left:34px}
+.node[data-depth="2"]{padding-left:68px}
+.node.running .mk{color:var(--acc)}
+.node.running .st{color:var(--acc)}
+.node.done .mk{color:var(--good)}
+.node.done .st{color:var(--mut)}
+.node.done .ti{color:var(--mut);text-decoration:line-through;text-decoration-color:var(--rule2)}
+.node.blocked .mk{color:var(--warn)}
+.node.blocked .st{color:var(--warn)}
+.mk.spin{display:inline-block;animation:rot 1.2s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── ACCEPTANCE CRITERIA ─────────────────── */
+.crit{list-style:none;margin-top:4px}
+.crit li{display:flex;gap:12px;align-items:baseline;padding:8px 0;font-size:14.5px;
+  border-bottom:1px dotted var(--rule)}
+.crit li .bx{font-family:var(--mono);color:var(--mut)}
+.crit li.ok .bx{color:var(--good)}
+.crit li.ok{color:var(--mut)}
+.crit li .who{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--mut);
+  letter-spacing:.08em;text-transform:uppercase}
+.crit li.ok .who{color:var(--good)}
+</style>
+<style>
+/* ── COST LEDGER ─────────────────────────── */
+.ledgerwrap{max-height:340px;overflow-y:auto}
+table.ledger{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px}
+.ledger th{text-align:left;color:var(--mut);font-weight:400;letter-spacing:.1em;
+  font-size:10px;text-transform:uppercase;padding:6px 8px;border-bottom:2px solid var(--ink);
+  position:sticky;top:0;background:var(--paper)}
+.ledger td{padding:7px 8px;border-bottom:1px dotted var(--rule);white-space:nowrap;
+  animation:fadein .35s}
+.ledger td.num{text-align:right;font-variant-numeric:tabular-nums}
+.ledger tr.tot td{border-top:2px solid var(--ink);border-bottom:0;font-weight:600;padding-top:9px}
+.ledger .cache-hit{color:var(--good)}
+.ledger .model-s{color:var(--mut)}
+.ledger .model-f{color:var(--acc)}
+.ledger th.hidecol,.ledger td.hidecol{display:none}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* ── CAPABILITY GRANTS ───────────────────── */
+.grant{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dotted var(--rule);font-size:14px}
+.grant .scope{font-family:var(--mono);font-size:12px;padding:3px 10px;
+  border:1px solid var(--rule2);flex-shrink:0}
+.grant .desc{flex:1;color:var(--mut);font-size:13.5px}
+.grant .ttl{font-family:var(--mono);font-size:11px;color:var(--warn);font-variant-numeric:tabular-nums}
+.grant.expired{opacity:.55}
+.grant.expired .scope{border-color:var(--acc);color:var(--acc)}
+.grant.expired .ttl{color:var(--acc)}
+
+/* ── FOOTER HINTS ────────────────────────── */
+.colophon{margin-top:40px;border-top:1px solid var(--rule);padding-top:14px;
+  display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;
+  color:var(--mut);letter-spacing:.06em;text-transform:uppercase}
+kbd{border:1px solid var(--rule2);padding:1px 7px;border-radius:3px;
+  font-family:var(--mono);box-shadow:0 2px 0 var(--rule2);font-size:10px;margin:0 2px}
+
+/* ── COMMAND PALETTE ─────────────────────── */
+.pal-ov{position:fixed;inset:0;background:rgba(20,17,12,.35);backdrop-filter:blur(3px);
+  z-index:90;display:none;justify-content:center;padding-top:12vh}
+.pal-ov.open{display:flex}
+.pal{width:min(560px,92vw);height:fit-content;background:var(--paper);border:1px solid var(--ink);
+  box-shadow:8px 8px 0 rgba(0,0,0,.18);animation:palin .18s ease-out}
+@keyframes palin{from{transform:translateY(-10px);opacity:0}}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--rule);background:transparent;
+  padding:16px 18px;font-family:var(--serif);font-size:17px;color:var(--ink);outline:none}
+.pal input::placeholder{color:var(--mut);font-style:italic}
+.pal ul{list-style:none;max-height:320px;overflow-y:auto}
+.pal li{display:flex;justify-content:space-between;align-items:center;padding:11px 18px;
+  cursor:pointer;font-size:14.5px;border-bottom:1px dotted var(--rule)}
+.pal li .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--mut)}
+.pal li.sel{background:var(--acc);color:#fff}
+.pal li.sel .cat{color:rgba(255,255,255,.75)}
+.pal .pfoot{padding:8px 18px;font-family:var(--mono);font-size:10px;color:var(--mut);
+  border-top:1px solid var(--rule);letter-spacing:.05em}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;
+  padding:11px 22px;z-index:99;transition:transform .3s;letter-spacing:.05em}
+.toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:900px){.maingrid{grid-template-columns:1fr}.colL{border-right:0;border-bottom:1px solid var(--rule);padding-right:2px}.colR{padding-left:2px}}
+</style>
+
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="pal-ov" id="palOv">
+  <div class="pal">
+    <input id="palIn" placeholder="Type a command — theme, density, gates, columns…" autocomplete="off"/>
+    <ul id="palList"></ul>
+    <div class="pfoot">↑↓ navigate · ↵ execute · esc close</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="rule-double"></div>
+    <div class="mast-row">
+      <div class="mast-title">ATL<span>A</span>S</div>
+      <div class="gate-badge" id="gateBadge">VERIFY GATES · STRICT</div>
+    </div>
+    <div class="mast-sub">Agent Operations Ledger — every action witnessed, priced &amp; reversible</div>
+    <div class="mast-meta">
+      <span>SESSION <b>№8841</b></span>
+      <span id="mDate"></span>
+      <span>RUNTIME <b id="uptime">00:00:00</b></span>
+    </div>
+  </header>
+
+  <div class="maingrid">
+    <div class="colL">
+      <div class="sec-head">PLAN №7 <b>·</b> MIGRATE AUTH PROVIDER</div>
+      <div id="tree"></div>
+
+      <div class="sec-head" style="margin-top:30px">ACCEPTANCE CRITERIA <b>·</b> VERIFIED BY GATE</div>
+      <ul class="crit" id="critList"></ul>
+    </div>
+
+    <div class="colR">
+      <div class="sec-head">COST LEDGER <b>·</b> LIVE</div>
+      <div class="ledgerwrap">
+        <table class="ledger">
+          <thead><tr>
+            <th>Time</th><th>Step</th><th>Model</th>
+            <th class="num">Tokens</th><th class="num cacheCol">Cache</th><th class="num">Cost</th>
+          </tr></thead>
+          <tbody id="ledgerBody">
+            <tr class="tot">
+              <td colspan="3">SESSION TOTAL</td>
+              <td class="num" id="tTok">0</td>
+              <td class="num cacheCol" id="tCache">—</td>
+              <td class="num" id="tCost">$0.000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sec-head" style="margin-top:30px">CAPABILITY GRANTS <b>·</b> SCOPED &amp; EXPIRING</div>
+      <div id="grants">
+        <div class="grant"><span class="scope">fs:read</span><span class="desc">~/projects/auth-migration only</span><span class="ttl" data-left="900">15:00</span></div>
+        <div class="grant"><span class="scope">net:get</span><span class="desc">api.github.com · rate-limited</span><span class="ttl" data-left="600">10:00</span></div>
+        <div class="grant"><span class="scope">shell:sandbox</span><span class="desc">microVM, no network egress</span><span class="ttl" data-left="1500">25:00</span></div>
+        <div class="grant expired"><span class="scope">db:write</span><span class="desc">staging users table</span><span class="ttl">EXPIRED</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="colophon">
+    <span><kbd>⌘K</kbd> command palette — themes, density, gates, columns</span>
+    <span>Atlas Agent Systems · MMXXVI</span>
+  </div>
+</div>
+<script>
+/* ── plan tree ─────────────────────────────── */
+var TREE=[
+ {d:0,id:'7.1',t:'Audit existing session middleware',s:'done'},
+ {d:1,id:'7.1a',t:'Map all token validation call-sites',s:'done'},
+ {d:1,id:'7.1b',t:'Inventory legacy session stores',s:'done'},
+ {d:0,id:'7.2',t:'Select OIDC provider & design token flow',s:'done'},
+ {d:0,id:'7.3',t:'Implement OIDC authorization-code flow',s:'running'},
+ {d:1,id:'7.3a',t:'Callback endpoint + state nonce',s:'running'},
+ {d:1,id:'7.3b',t:'Refresh-token rotation service',s:'blocked',why:'awaits provider sandbox creds'},
+ {d:0,id:'7.4',t:'Migration shim for legacy sessions',s:'pending'},
+ {d:0,id:'7.5',t:'Chaos drill: rollback in under 60s',s:'pending'},
+ {d:0,id:'7.6',t:'Critic review + acceptance gates',s:'pending'}];
+var MK={done:'✓',running:'◈',blocked:'▮',pending:'·'};
+function renderTree(){tree.innerHTML=TREE.map(function(n){
+  return '<div class="node '+n.s+'" data-depth="'+n.d+'">'+
+   '<span class="mk'+(n.s==='running'?' spin':'')+'">'+MK[n.s]+'</span>'+
+   '<span class="id">'+n.id+'</span><span class="ti">'+n.t+
+   (n.why?' <em style="color:var(--mut);font-size:13px">— '+n.why+'</em>':'')+
+   '</span><span class="st">'+n.s+'</span></div>';}).join('');}
+renderTree();
+setInterval(function(){
+  var i=TREE.findIndex(function(n){return n.s==='running'});
+  if(i>-1&&Math.random()<0.5){TREE[i].s='done';}
+  else{var b=TREE.findIndex(function(n){return n.s==='blocked'});
+    if(b>-1){TREE[b].s='running';delete TREE[b].why;}
+    else{var p=TREE.findIndex(function(n){return n.s==='pending'});
+      if(p>-1)TREE[p].s='running';}}
+  renderTree();},5200);
+/* ── acceptance criteria ───────────────────── */
+var CRIT=[
+ ['All 47 legacy sessions survive migration without logout','tests:integration'],
+ ['OIDC discovery doc validated & pinned by thumbprint','sec:scanner'],
+ ['Zero secret material in logs above DEBUG','sec:audit'],
+ ['Rollback restores v1 auth in ≤60s (measured)','chaos:drill'],
+ ['Critic model signs off — no behavioural regressions','critic-v0']];
+var ck=0;
+function addCrit(){if(ck>=CRIT.length)return;
+  var li=document.createElement('li');li.className='ok';
+  li.innerHTML='<span class="bx">[×]</span><span>'+CRIT[ck][0]+'</span><span class="who">✓ '+CRIT[ck][1]+'</span>';
+  critList.appendChild(li);ck++;}
+setTimeout(addCrit,900);setInterval(addCrit,6500);
+
+/* ── cost ledger ───────────────────────────── */
+var STEPS=['plan','retrieve','impl:oidc-callback','fold context','route→local','impl:refresh','tests:e2e','rehydrate fold','verify:gate','critic review'];
+var totTok=0,totCost=0,totCache=0,nRows=0;
+function totRow(){return ledgerBody.querySelector('tr.tot')}
+function ledgerRow(){
+  var tb=ledgerBody,model=Math.random()<0.62?'LOCAL-8B':'FRONTIER';
+  var tk=model==='LOCAL-8B'?800+Math.floor(Math.random()*2500):3000+Math.floor(Math.random()*9000);
+  var cost=model==='LOCAL-8B'?tk*0.0000006:tk*0.000009;
+  var ch=Math.random()<0.72?40+Math.floor(Math.random()*56):Math.floor(Math.random()*30);
+  var tr=document.createElement('tr');
+  var t=new Date(),hh=String(t.getHours()).padStart(2,'0'),mm=String(t.getMinutes()).padStart(2,'0'),ss=String(t.getSeconds()).padStart(2,'0');
+  tr.innerHTML='<td>'+hh+':'+mm+':'+ss+'</td>'+
+   '<td>'+STEPS[Math.floor(Math.random()*STEPS.length)]+'</td>'+
+   '<td class="'+(model==='LOCAL-8B'?'model-s':'model-f')+'">'+model+'</td>'+
+   '<td class="num">'+tk.toLocaleString('en-US')+'</td>'+
+   '<td class="num cacheCol'+(ch>50?' cache-hit':'')+'">'+ch+'%</td>'+
+   '<td class="num">$'+cost.toFixed(4)+'</td>';
+  tb.insertBefore(tr,totRow());
+  totTok+=tk;totCost+=cost;totCache+=ch;nRows++;
+  tTok.textContent=totTok.toLocaleString('en-US');
+  tCache.textContent=Math.round(totCache/nRows)+'%';
+  tCost.textContent='$'+totCost.toFixed(3);
+  var rows=tb.querySelectorAll('tr:not(.tot)');
+  if(rows.length>12)tb.removeChild(rows[0]);
+}
+for(var q=0;q<5;q++)ledgerRow();
+setInterval(ledgerRow,3400);
+
+/* ── capability grants countdown ───────────── */
+setInterval(function(){
+  document.querySelectorAll('.ttl[data-left]').forEach(function(el){
+    var left=+el.dataset.left-1;
+    if(left<=0){el.removeAttribute('data-left');el.textContent='EXPIRED';
+      el.parentElement.classList.add('expired');}
+    else{el.dataset.left=left;
+      el.textContent=String(Math.floor(left/60)).padStart(2,'0')+':'+String(left%60).padStart(2,'0');}})},1000);
+
+/* ── uptime ────────────────────────────────── */
+var sec=0;
+setInterval(function(){sec++;
+  uptime.textContent=String(Math.floor(sec/3600)).padStart(2,'0')+':'+
+    String(Math.floor(sec/60)%60).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');},1000);
+/* ── command palette ───────────────────────── */
+var CMDS=[
+ {n:'Theme — Paper',c:'appearance',f:function(){cfg.theme='paper';done('Paper theme')}},
+ {n:'Theme — Slate',c:'appearance',f:function(){cfg.theme='slate';done('Slate theme')}},
+ {n:'Theme — Noir',c:'appearance',f:function(){cfg.theme='noir';done('Noir theme')}},
+ {n:'Accent — Crimson',c:'appearance',f:function(){cfg.accent='#b5301c';done('Crimson accent')}},
+ {n:'Accent — Cobalt',c:'appearance',f:function(){cfg.accent='#2456a6';done('Cobalt accent')}},
+ {n:'Density — Comfortable',c:'layout',f:function(){cfg.density='comfortable';done('Comfortable density')}},
+ {n:'Density — Compact',c:'layout',f:function(){cfg.density='compact';done('Compact density')}},
+ {n:'Column — Toggle cache column',c:'layout',f:function(){cfg.cacheCol=!cfg.cacheCol;done('Cache column '+(cfg.cacheCol?'shown':'hidden'))}},
+ {n:'Gates — Strict',c:'verification',f:function(){cfg.gates='strict';done('Gates: STRICT')}},
+ {n:'Gates — Advisory',c:'verification',f:function(){cfg.gates='advisory';done('Gates: ADVISORY')}},
+ {n:'Gates — Draft (log only)',c:'verification',f:function(){cfg.gates='draft';done('Gates: DRAFT')}},
+ {n:'Export configuration as JSON',c:'system',f:function(){
+    var json=JSON.stringify(cfg,null,2);
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(json).then(function(){done('Config copied to clipboard')},
+        function(){done(json)});
+    else done(json);}}];
+var sel=0,filtered=CMDS;
+function done(msg){save();apply();closePal();toast(msg);}
+function openPal(){palOv.classList.add('open');palIn.value='';filter();palIn.focus();}
+function closePal(){palOv.classList.remove('open');}
+function filter(){var q=palIn.value.toLowerCase();
+  filtered=CMDS.filter(function(c){return c.n.toLowerCase().indexOf(q)>-1});
+  sel=0;renderPal();}
+function renderPal(){
+  palList.innerHTML=filtered.map(function(c,i){
+    return '<li data-i="'+i+'" class="'+(i===sel?'sel':'')+'"><span>'+c.n+'</span><span class="cat">'+c.c+'</span></li>';}).join('')
+    ||'<li><span style="color:var(--mut)">No matching command</span></li>';
+  palList.querySelectorAll('li[data-i]').forEach(function(li){
+    li.onclick=function(){filtered[+li.dataset.i].f()};});
+  var s=palList.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});}
+palIn.oninput=filter;
+palIn.onkeydown=function(e){
+  if(e.key==='ArrowDown'){sel=Math.min(filtered.length-1,sel+1);renderPal();e.preventDefault();}
+  else if(e.key==='ArrowUp'){sel=Math.max(0,sel-1);renderPal();e.preventDefault();}
+  else if(e.key==='Enter'&&filtered[sel]){filtered[sel].f();}};
+palOv.addEventListener('click',function(e){if(e.target===palOv)closePal()});
+document.addEventListener('keydown',function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();
+    palOv.classList.contains('open')?closePal():openPal();}
+  else if(e.key==='Escape')closePal();});
+var hintSpan=document.querySelector('.colophon span');
+hintSpan.style.cursor='pointer';
+hintSpan.onclick=openPal;
+
+/* ── toast ─────────────────────────────────── */
+var toastTimer=null;
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show')},2200);}
+
+apply();
+
+
+
+</script>
+</body>
+
+</html>

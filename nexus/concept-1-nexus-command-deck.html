@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NEXUS · Agent Command Deck</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --acc:#22d3ee;--accdim:rgba(34,211,238,.13);
+  --bg:#06090f;--pan:#0b121c;--pan2:#0f1826;--line:#1a2739;
+  --txt:#d8e5f2;--mut:#5d7793;--good:#35d99a;--warn:#f5c04e;--bad:#ff6b6b;
+  --gap:14px;--rad:5px;
+  --fm:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);font-family:var(--fm);font-size:13px;display:flex;flex-direction:column;overflow:hidden}
+body[data-density=compact]{--gap:8px;font-size:12px}
+body[data-theme=midnight]{--bg:#0b1020;--pan:#101a33;--pan2:#152142;--line:#24345c}
+body[data-theme=carbon]{--bg:#111214;--pan:#191b1e;--pan2:#1f2226;--line:#2c3037}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:44px 44px;opacity:.13}
+.scan{position:fixed;inset:0;pointer-events:none;z-index:60;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.028) 0 1px,transparent 1px 3px)}
+.scan.off{display:none}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ── TOP BAR ─────────────────────────────── */
+header.top{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:var(--gap);
+  padding:10px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+.brand{font-size:15px;letter-spacing:.24em;color:var(--acc)}
+.brand span{display:block;font-size:9px;letter-spacing:.32em;color:var(--mut);margin-top:2px}
+.topstats{display:flex;align-items:center;gap:24px}
+.tstat label{display:block;font-size:9px;letter-spacing:.26em;color:var(--mut)}
+.tstat .val{margin-top:3px;font-size:12px}
+.meter{width:150px;height:6px;background:var(--pan2);border:1px solid var(--line);margin-top:5px}
+.meter i{display:block;height:100%;width:35%;background:var(--acc);transition:width .6s}
+.cfgbtn{font:inherit;font-size:11px;letter-spacing:.16em;color:var(--txt);background:var(--pan2);
+  border:1px solid var(--line);padding:9px 16px;border-radius:var(--rad);cursor:pointer;transition:.2s}
+.cfgbtn:hover{border-color:var(--acc);color:var(--acc);box-shadow:0 0 14px var(--accdim)}
+
+/* ── LAYOUT ──────────────────────────────── */
+main.grid{position:relative;z-index:1;flex:1;display:grid;grid-template-columns:250px 1fr 300px;gap:var(--gap);padding:var(--gap);min-height:0}
+.stack{display:flex;flex-direction:column;gap:var(--gap);min-height:0;overflow-y:auto}
+.panel{background:var(--pan);border:1px solid var(--line);border-radius:var(--rad);padding:14px;
+  display:flex;flex-direction:column;min-height:0;position:relative}
+.panel::before{content:'';position:absolute;top:-1px;left:-1px;width:10px;height:10px;
+  border-top:1px solid var(--acc);border-left:1px solid var(--acc)}
+.panel::after{content:'';position:absolute;bottom:-1px;right:-1px;width:10px;height:10px;
+  border-bottom:1px solid var(--acc);border-right:1px solid var(--acc)}
+.panel h2{font-size:10px;letter-spacing:.3em;color:var(--mut);margin-bottom:12px;display:flex;align-items:center;gap:8px;font-weight:400}
+[data-mod].off{display:none!important}
+
+/* ── PIPELINE ────────────────────────────── */
+#p-pipeline ol{list-style:none;display:flex;flex-direction:column;gap:2px}
+#p-pipeline li{display:flex;align-items:center;gap:10px;padding:11px 10px;color:var(--mut);
+  border-left:2px solid var(--line);transition:.3s;letter-spacing:.14em;font-size:12px}
+#p-pipeline li i{width:8px;height:8px;background:var(--line);transform:rotate(45deg);flex-shrink:0;transition:.3s}
+#p-pipeline li.done i{background:var(--good)}
+#p-pipeline li.act{color:var(--acc);border-left-color:var(--acc);background:var(--accdim)}
+#p-pipeline li.act i{background:var(--acc);animation:pulse 1s infinite}
+@keyframes pulse{50%{box-shadow:0 0 12px currentColor}}
+.op{margin-top:14px;padding:10px;background:var(--pan2);border:1px dashed var(--line);
+  color:var(--mut);font-size:11px;line-height:1.55;min-height:70px}
+
+/* ── CONSOLE ─────────────────────────────── */
+#p-console{flex:1}
+#console{flex:1;overflow-y:auto;padding:2px;line-height:1.8;font-size:12px}
+.ln{white-space:pre-wrap;word-break:break-word;animation:fadein .3s}
+.ln .t{color:var(--mut)}
+.tag{padding:1px 7px;border:1px solid;margin-right:8px;font-size:10px;border-radius:2px}
+.tg-tool{color:var(--warn);border-color:var(--warn)}
+.tg-ok{color:var(--good);border-color:var(--good)}
+.tg-route{color:#b48cff;border-color:#b48cff}
+.tg-mem{color:var(--acc);border-color:var(--acc)}
+.tg-sec{color:var(--bad);border-color:var(--bad)}
+.tg-fold{color:#7dd3fc;border-color:#7dd3fc}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--good);animation:pulse 1.4s infinite;margin-left:auto}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}to{opacity:1}}
+</style>
+<style>
+/* ── RIGHT STACK ─────────────────────────── */
+.ringwrap{display:flex;gap:16px;align-items:center;margin-bottom:10px}
+.ringwrap svg{transform:rotate(-90deg)}
+.ringwrap .track{fill:none;stroke:var(--pan2);stroke-width:7}
+.ringwrap .prog{fill:none;stroke:var(--acc);stroke-width:7;stroke-linecap:round;
+  stroke-dasharray:283;stroke-dashoffset:94;transition:stroke-dashoffset 1s}
+.ringpct{font-size:20px}
+.ringlab{font-size:10px;color:var(--mut);letter-spacing:.2em;margin-top:4px}
+.memrow{display:flex;justify-content:space-between;font-size:11px;padding:7px 0;border-bottom:1px dashed var(--line)}
+.memrow b{color:var(--acc);font-weight:400}
+
+#crit{list-style:none;display:flex;flex-direction:column;gap:9px;overflow-y:auto;flex:1}
+#crit li{display:flex;gap:9px;font-size:11.5px;color:var(--mut);align-items:flex-start;animation:fadein .4s;line-height:1.45}
+#crit li .st{margin-left:auto;flex-shrink:0;letter-spacing:.1em;font-size:10px;padding-top:1px}
+.st.pass{color:var(--good)}
+.st.fail{color:var(--bad)}
+.st.wait{opacity:.5}
+
+.lane{margin:11px 0}
+.lane .lab{display:flex;justify-content:space-between;font-size:10px;color:var(--mut);letter-spacing:.18em}
+.lane .bar{height:8px;background:var(--pan2);border:1px solid var(--line);margin-top:6px}
+.lane .bar i{display:block;height:100%;background:var(--good);transition:width .9s}
+.lane.frontier .bar i{background:var(--warn)}
+.saved{margin-top:12px;font-size:11px;color:var(--good)}
+
+/* ── BOTTOM BAR ──────────────────────────── */
+footer.bottom{position:relative;z-index:2;display:flex;align-items:center;gap:14px;
+  padding:9px 18px;border-top:1px solid var(--line);overflow:hidden}
+.lbl{font-size:9px;letter-spacing:.3em;color:var(--mut);white-space:nowrap}
+.chips{display:flex;gap:8px;overflow:hidden}
+.chip{font-size:10px;padding:5px 10px;border:1px solid var(--line);color:var(--mut);
+  white-space:nowrap;border-radius:3px;transition:.4s}
+.chip b{color:var(--acc);font-weight:400;margin-right:7px}
+.chip.exp{color:var(--bad);border-color:var(--bad);text-decoration:line-through}
+
+/* ── CONFIG DRAWER ───────────────────────── */
+#drawer{position:fixed;top:0;right:-340px;width:330px;height:100%;background:var(--pan);
+  border-left:1px solid var(--line);z-index:80;transition:right .3s cubic-bezier(.2,.8,.2,1);
+  padding:20px;overflow-y:auto;box-shadow:-20px 0 50px rgba(0,0,0,.4)}
+#drawer.open{right:0}
+#drawer h3{font-size:11px;letter-spacing:.32em;color:var(--acc);margin:22px 0 10px;font-weight:400}
+#drawer h3:first-of-type{margin-top:0}
+.dhead{display:flex;justify-content:space-between;align-items:center;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.dhead span{letter-spacing:.3em;font-size:13px;color:var(--txt)}
+.swatches{display:flex;gap:9px}
+.sw{width:27px;height:27px;border-radius:3px;cursor:pointer;border:2px solid transparent;transition:.15s}
+.sw.on{border-color:#fff;transform:scale(1.1)}
+.seg{display:flex;border:1px solid var(--line)}
+.seg button{flex:1;font-family:inherit;font-size:10px;padding:8px;background:transparent;
+  color:var(--mut);border:0;cursor:pointer;letter-spacing:.12em}
+.seg button.on{background:var(--accdim);color:var(--acc)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;
+  border-bottom:1px dashed var(--line);font-size:11px}
+input[type=range]{accent-color:var(--acc);width:120px}
+input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px}
+.hint{font-size:10px;color:var(--mut);margin-top:14px;line-height:1.6}
+@media(max-width:1100px){main.grid{grid-template-columns:1fr;overflow-y:auto}}
+</style>
+
+</head>
+<body>
+<div class="scan"></div>
+<header class="top">
+  <div class="brand">◆ NEXUS<span>AGENT COMMAND DECK · v0.9</span></div>
+  <div class="topstats">
+    <div class="tstat"><label>BUDGET</label><div class="meter"><i id="budgetBar"></i></div><div class="val" id="budgetTxt">$4.20 / $12.00</div></div>
+    <div class="tstat"><label>TOKENS / SESSION</label><div class="val" id="tokTxt">184,203</div></div>
+    <div class="tstat"><label>UPTIME</label><div class="val" id="clock">00:00:00</div></div>
+    <button class="cfgbtn" id="cfgBtn">⚙ CONFIG</button>
+  </div>
+</header>
+
+<main class="grid">
+  <section class="panel" data-mod="pipeline" id="p-pipeline">
+    <h2>AGENT LOOP</h2>
+    <ol id="pipe">
+      <li data-s="0"><i></i>PLAN</li>
+      <li data-s="1"><i></i>RETRIEVE</li>
+      <li data-s="2"><i></i>ACT</li>
+      <li data-s="3"><i></i>VERIFY</li>
+      <li data-s="4"><i></i>COMMIT</li>
+    </ol>
+    <div class="op" id="curOp">awaiting task…</div>
+  </section>
+
+  <section class="panel" data-mod="console" id="p-console">
+    <h2>LIVE TELEMETRY <span class="dot"></span></h2>
+    <div id="console"></div>
+  </section>
+
+  <aside class="stack">
+    <section class="panel" data-mod="memory">
+      <h2>MEMORY CORE</h2>
+      <div class="ringwrap">
+        <svg width="96" height="96" viewBox="0 0 100 100">
+          <circle class="track" cx="50" cy="50" r="45"/>
+          <circle class="prog" cx="50" cy="50" r="45"/>
+        </svg>
+        <div><div class="ringpct" id="memPct">67%</div><div class="ringlab">RECALL HIT-RATE</div></div>
+      </div>
+      <div class="memrow"><span>Episodic entries</span><b id="epis">1,284</b></div>
+      <div class="memrow"><span>Semantic facts</span><b>312</b></div>
+      <div class="memrow"><span>Folds rehydrated</span><b id="folds">47</b></div>
+      <div class="memrow"><span>Consolidations run</span><b>9</b></div>
+    </section>
+
+    <section class="panel" data-mod="verify" style="flex:1">
+      <h2>VERIFY GATE</h2>
+      <ul id="crit"></ul>
+    </section>
+
+    <section class="panel" data-mod="router">
+      <h2>MODEL ROUTER</h2>
+      <div class="lane"><div class="lab"><span>LOCAL · 8B</span><span id="rLocal">62%</span></div><div class="bar"><i id="barLocal" style="width:62%"></i></div></div>
+      <div class="lane frontier"><div class="lab"><span>FRONTIER</span><span id="rFront">38%</span></div><div class="bar"><i id="barFront" style="width:38%"></i></div></div>
+      <div class="saved">$ saved by routing today: <span id="savedAmt">$3.87</span></div>
+    </section>
+  </aside>
+</main>
+
+<footer class="bottom">
+  <span class="lbl">CAPABILITY GRANTS</span>
+  <div class="chips" id="caps"></div>
+</footer>
+
+<aside id="drawer">
+  <div class="dhead"><span>CONFIGURATION</span><button class="cfgbtn" id="closeBtn">✕ CLOSE</button></div>
+  <h3>THEME</h3>
+  <div class="seg" id="themeSeg">
+    <button data-v="void">VOID</button><button data-v="midnight">MIDNIGHT</button><button data-v="carbon">CARBON</button>
+  </div>
+  <h3>ACCENT</h3>
+  <div class="swatches" id="accSw">
+    <div class="sw" data-c="#22d3ee" style="background:#22d3ee"></div>
+    <div class="sw" data-c="#35d99a" style="background:#35d99a"></div>
+    <div class="sw" data-c="#f5c04e" style="background:#f5c04e"></div>
+    <div class="sw" data-c="#ff6bd6" style="background:#ff6bd6"></div>
+    <div class="sw" data-c="#7d8bff" style="background:#7d8bff"></div>
+  </div>
+  <h3>DENSITY</h3>
+  <div class="seg" id="densSeg">
+    <button data-v="comfortable">COMFORTABLE</button><button data-v="compact">COMPACT</button>
+  </div>
+  <h3>MODULES</h3>
+  <div class="row"><span>Agent loop</span><input type="checkbox" data-m="pipeline" checked></div>
+  <div class="row"><span>Live telemetry</span><input type="checkbox" data-m="console" checked></div>
+  <div class="row"><span>Memory core</span><input type="checkbox" data-m="memory" checked></div>
+  <div class="row"><span>Verify gate</span><input type="checkbox" data-m="verify" checked></div>
+  <div class="row"><span>Model router</span><input type="checkbox" data-m="router" checked></div>
+  <h3>TELEMETRY SPEED</h3>
+  <div class="row"><span>Simulation rate</span><span><input type="range" id="spd" min="0.5" max="3" step="0.25" value="1"> <b id="spdVal">1×</b></span></div>
+  <div class="row"><span>Scanlines</span><input type="checkbox" id="scanT" checked></div>
+  <p class="hint">Every setting persists locally. Each panel is a module — the deck is fully data-driven, so panels can be detached, resized or reordered without touching the engine.</p>
+</aside>
+<script>
+'use strict';
+var DEF={theme:'void',accent:'#22d3ee',density:'comfortable',speed:1,scan:true,
+  mods:{pipeline:true,console:true,memory:true,verify:true,router:true}};
+var cfg=load();
+function load(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('nexus_cfg')||'{}'))}catch(e){return JSON.parse(JSON.stringify(DEF))}}
+function save(){localStorage.setItem('nexus_cfg',JSON.stringify(cfg))}
+function hex2rgb(h){var n=parseInt(h.slice(1),16);return[(n>>16)&255,(n>>8)&255,n&255]}
+
+function apply(){
+  document.body.dataset.theme=cfg.theme;
+  document.body.dataset.density=cfg.density;
+  var r=document.documentElement.style,rgb=hex2rgb(cfg.accent);
+  r.setProperty('--acc',cfg.accent);
+  r.setProperty('--accdim','rgba('+rgb.join(',')+',.13)');
+  document.querySelector('.scan').classList.toggle('off',!cfg.scan);
+  document.querySelectorAll('[data-mod]').forEach(function(el){
+    el.classList.toggle('off',!cfg.mods[el.dataset.mod]);});
+  syncUI();
+}
+function syncUI(){
+  document.querySelectorAll('#themeSeg button').forEach(function(b){
+    b.classList.toggle('on',b.dataset.v===cfg.theme);});
+  document.querySelectorAll('#densSeg button').forEach(function(b){
+    b.classList.toggle('on',b.dataset.v===cfg.density);});
+  document.querySelectorAll('.sw').forEach(function(s){
+    s.classList.toggle('on',s.dataset.c===cfg.accent);});
+  document.querySelectorAll('input[data-m]').forEach(function(c){
+    c.checked=!!cfg.mods[c.dataset.m];});
+  document.getElementById('spd').value=cfg.speed;
+  document.getElementById('spdVal').textContent=cfg.speed+'×';
+  document.getElementById('scanT').checked=cfg.scan;
+}
+
+/* drawer */
+document.getElementById('cfgBtn').onclick=function(){document.getElementById('drawer').classList.add('open')};
+document.getElementById('closeBtn').onclick=function(){document.getElementById('drawer').classList.remove('open')};
+function wireSeg(id,key){document.querySelectorAll('#'+id+' button').forEach(function(b){
+  b.onclick=function(){cfg[key]=b.dataset.v;save();apply();};});}
+wireSeg('themeSeg','theme');wireSeg('densSeg','density');
+document.querySelectorAll('.sw').forEach(function(s){
+  s.onclick=function(){cfg.accent=s.dataset.c;save();apply();};});
+document.querySelectorAll('input[data-m]').forEach(function(c){
+  c.onchange=function(){cfg.mods[c.dataset.m]=c.checked;save();apply();};});
+document.getElementById('spd').oninput=function(e){cfg.speed=parseFloat(e.target.value);save();syncUI();};
+document.getElementById('scanT').onchange=function(e){cfg.scan=e.target.checked;save();apply();};
+/* clock */
+var up=0;
+setInterval(function(){up++;
+  var h=String(Math.floor(up/3600)).padStart(2,'0'),
+      m=String(Math.floor(up/60)%60).padStart(2,'0'),
+      s=String(up%60).padStart(2,'0');
+  document.getElementById('clock').textContent=h+':'+m+':'+s;},1000);
+
+/* telemetry */
+var LINES=[
+ ['tg-mem','memory.write  "user prefers compact diffs" → episodic store'],
+ ['tg-route','router.score(difficulty=0.21) → LOCAL-8B · saved $0.041'],
+ ['tg-tool','$ git diff --stat HEAD~1','14 files changed, 812 insertions(+)'],
+ ['tg-fold','context fold #12 · archived 9.4k tokens → folds/0012.idx (lossless)'],
+ ['tg-ok','verify: pytest tests/auth -q … 47 passed in 3.82s'],
+ ['tg-sec','capability check → shell denied outside sandbox · policy=default-deny'],
+ ['tg-tool','$ rg "sessionMiddleware" src/ -l','11 matches in 6 files'],
+ ['tg-route','router.score(difficulty=0.83) → FRONTIER · escalation justified'],
+ ['tg-ok','crit-v0 verified claim against 3 independent sources'],
+ ['tg-mem','consolidator merged 7 duplicate entries → semantic fact #218'],
+ ['tg-tool','$ docker compose up -d auth-staging','container healthy (0.9s)'],
+ ['tg-fold','rehydrate folds/0008.idx → 6.1k tokens restored on demand'],
+ ['tg-ok','plan ledger synced · step 7.3 marked done'],
+ ['tg-sec','prompt-injection taint scan → 0 untrusted flows into tool calls']];
+var tokEl=document.getElementById('tokTxt'),tokN=184203,epis=1284,folds=47;
+var conEl=document.getElementById('console');
+function push(){
+  var i=Math.floor(Math.random()*LINES.length),L=LINES[i],now=new Date();
+  var d=document.createElement('div');d.className='ln';
+  var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  var extra=(L.length>2)?'\n           '+L[2]:'';
+  d.textContent=t+'  ';
+  var tag=document.createElement('span');tag.className='tag '+L[0];tag.textContent=L[0].slice(3);
+  d.appendChild(tag);d.appendChild(document.createTextNode(L[1]+extra));
+  conEl.appendChild(d);
+  while(conEl.children.length>80)conEl.removeChild(conEl.firstChild);
+  conEl.scrollTop=conEl.scrollHeight;
+  tokN+=Math.floor(Math.random()*420)+40;
+  tokEl.textContent=tokN.toLocaleString('en-US');
+  if(L[0]==='tg-mem'){epis++;document.getElementById('epis').textContent=epis.toLocaleString('en-US');}
+  if(L[0]==='tg-fold'){folds++;document.getElementById('folds').textContent=folds;}
+}
+function loopPush(){push();setTimeout(loopPush,1400/cfg.speed);}
+/* pipeline */
+var OPS=['decomposing task into a verifiable plan…','hybrid recall: semantic ∥ keyword ∥ recency',
+ 'executing step 7.3 inside microVM sandbox…','running acceptance gates before commit…',
+ 'committing · writing plan ledger + memory deltas'];
+var stage=-1;
+function loopPipe(){
+  var lis=document.querySelectorAll('#pipe li');
+  lis.forEach(function(li){li.classList.remove('act');li.classList.remove('done');});
+  stage=(stage+1)%lis.length;
+  lis.forEach(function(li,i){
+    if(i<stage||(stage===0&&i===lis.length-1))li.classList.add('done');
+    if(i===stage)li.classList.add('act');});
+  document.getElementById('curOp').textContent='▸ '+OPS[stage];
+  setTimeout(loopPipe,3200/cfg.speed);
+}
+
+/* verify gate */
+var CRITS=[['OIDC discovery document cached & validated','tests:e2e'],
+ ['All 47 legacy sessions migrate without logout','tests:int'],
+ ['No secret material logged above DEBUG level','sec-scan'],
+ ['Rollback script restores v1 auth in ≤60s','chaos-drill'],
+ ['Diff reviewed by critic model · no regressions','critic-v0']];
+var ci=0,critEl=document.getElementById('crit'),budget=4.20;
+function loopCrit(){
+  if(ci<CRITS.length){
+    var ok=Math.random()>0.14,d=document.createElement('div');
+    d.style.display='flex';d.style.gap='9px';
+    d.innerHTML='<span style="color:'+(ok?'var(--good)':'var(--bad)')+'">'+(ok?'✓':'✗')+'</span>'+
+     '<span>'+CRITS[ci][0]+' <span style="opacity:.55">· '+CRITS[ci][1]+'</span></span>';
+    var st=document.createElement('span');st.className='st '+(ok?'pass':'fail');
+    st.textContent=ok?'PASS':'FAIL·RETRY';
+    d.appendChild(st);critEl.appendChild(d);ci++;
+    budget+=0.05+Math.random()*0.15;
+    document.getElementById('budgetTxt').textContent='$'+budget.toFixed(2)+' / $12.00';
+    document.getElementById('budgetBar').style.width=Math.min(100,budget/12*100)+'%';
+  }
+  setTimeout(loopCrit,3600/cfg.speed);
+}
+
+/* router */
+var localPct=62,saved=3.87;
+setInterval(function(){
+  localPct=Math.max(42,Math.min(78,localPct+(Math.random()*10-5)));
+  document.getElementById('rLocal').textContent=Math.round(localPct)+'%';
+  document.getElementById('barLocal').style.width=localPct+'%';
+  document.getElementById('rFront').textContent=Math.round(100-localPct)+'%';
+  document.getElementById('barFront').style.width=(100-localPct)+'%';
+},4000);
+setInterval(function(){saved+=0.02+Math.random()*0.06;
+  document.getElementById('savedAmt').textContent='$'+saved.toFixed(2);},7000);
+
+/* capability grants */
+var CAPS=[['fs:read','~/projects only',900],['net:get','api.github.com',600],
+          ['shell','µVM sandbox',1500],['mem:write','profile-local',420]];
+var capsEl=document.getElementById('caps');
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+CAPS.forEach(function(c){var d=document.createElement('div');d.className='chip';
+  d.innerHTML='<b>'+c[0]+'</b>'+c[1]+' · ';
+  var sp=document.createElement('span');sp.textContent=fmt(c[2]);
+  d.appendChild(sp);c.sp=sp;c.el=d;capsEl.appendChild(d);});
+setInterval(function(){CAPS.forEach(function(c){if(c[2]>0){c[2]--;
+  if(c[2]===0){c.el.classList.add('exp');c.sp.textContent='EXPIRED';}
+  else c.sp.textContent=fmt(c[2]);}})},1000);
+
+/* memory ring drift */
+var pct=67;
+setInterval(function(){pct=Math.max(52,Math.min(88,pct+(Math.random()*6-3)));
+  document.getElementById('memPct').textContent=Math.round(pct)+'%';
+  document.querySelector('.prog').style.strokeDashoffset=283-(283*pct/100);},5000);
+
+apply();loopPush();loopPipe();loopCrit();
+
+
+
+</script>
+</body>
+
+</html>

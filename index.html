@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Agent UI — 3 koncepter</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--acc:#e8b64c}
+body{min-height:100vh;background:#0c0a09;color:#ece7de;
+  font-family:ui-serif,Georgia,serif;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;z-index:-1;opacity:.5;
+  background:radial-gradient(ellipse 60% 40% at 70% -10%,rgba(232,182,76,.14),transparent),
+             radial-gradient(ellipse 50% 40% at 10% 110%,rgba(80,140,220,.1),transparent)}
+.wrap{max-width:1060px;margin:0 auto;padding:60px 28px;width:100%}
+.kicker{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.4em;
+  text-transform:uppercase;color:var(--acc);margin-bottom:18px}
+h1{font-size:clamp(34px,6vw,58px);font-weight:500;line-height:1.08;letter-spacing:-.01em;max-width:20ch}
+h1 em{font-style:italic;color:var(--acc)}
+.intro{margin-top:22px;max-width:62ch;color:#b5ada0;font-size:17px;line-height:1.65}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:52px}
+.card{display:flex;flex-direction:column;text-decoration:none;color:inherit;
+  border:1px solid #2b2721;border-radius:14px;overflow:hidden;
+  background:#141210;transition:.25s transform,.25s border-color}
+.card:hover{transform:translateY(-6px);border-color:var(--acc)}
+.preview{height:150px;position:relative;display:flex;align-items:flex-end;padding:16px}
+.p1{background:linear-gradient(160deg,#0a1420,#123);color:#22d3ee}
+.p1::after{content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(34,211,238,.12) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(34,211,238,.12) 1px,transparent 1px);background-size:22px 22px}
+.p2{background:linear-gradient(135deg,#241a4d,#0d3b4f 55%,#4d1f3d)}
+.p2::after{content:'';position:absolute;right:-30px;top:-40px;width:130px;height:130px;
+  border-radius:50%;background:#7c3aed;filter:blur(38px)}
+.p2::before{content:'';position:absolute;left:-20px;bottom:-50px;width:120px;height:120px;
+  border-radius:50%;background:#06b6d4;filter:blur(38px)}
+.p3{background:#efece4;color:#191712;border-bottom:1px solid #d9d3c6}
+.p3 .glyph{font-size:26px;letter-spacing:.3em;color:#b5301c}
+.pnum{position:relative;z-index:1;font-family:ui-monospace,Menlo,monospace;font-size:10px;
+  letter-spacing:.3em;opacity:.75}
+.cbody{padding:20px 20px 24px;flex:1;display:flex;flex-direction:column}
+h2{font-size:21px;font-weight:550;margin-bottom:8px}
+.tagline{font-style:italic;color:#9a9285;font-size:13.5px;margin-bottom:14px;line-height:1.5}
+ul{list-style:none;font-family:ui-monospace,Menlo,monospace;font-size:11px;
+  color:#8d8578;line-height:2;margin-top:auto}
+ul li::before{content:'— ';color:var(--acc)}
+.foot{margin-top:46px;display:flex;justify-content:space-between;
+  font-family:ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.15em;
+  color:#6d6558;text-transform:uppercase}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kicker">Agent Systems · UI Direction</div>
+  <h1>Tre ansigter på <em>den samme motor.</em></h1>
+  <p class="intro">Hvert koncept er et fuldt fungerende, interaktivt dashboard for agent-systemet — med levende telemetri og en rigtig konfigurationsmotor (temaer, accentfarver, moduler, densitet), der gemmer dine valg lokalt. Åbn et kort og leg med indstillingerne.</p>
+
+  <nav class="grid">
+    <a class="card" style="grid-column:1/-1;border-color:#8a5a20;background:#171310" href="fusion/concept-4-fusion.html">
+      <div class="cbody">
+        <h2 style="color:#e8b64c">★ NYT — FUSION · Aurum Edition</h2>
+        <p class="tagline">Blandingen af alle tre: Atlas' redaktionelle skelet, Auras glas &amp; aurora, Nexus' levende telemetri. Fuldt konfigurerbar — prøv ⚙ og ⌘K.</p>
+      </div>
+    </a>
+        <a class="card" href="atlas/atlas-app.html">
+      <div class="preview p3"><span class="pnum">APP · KLIKBAR PROTOTYPE</span></div>
+      <div class="cbody">
+        <h2>ATLAS APP</h2>
+        <p class="tagline">Hele informationsarkitekturen: 12 sektioner, 50 undermenuer, ⌘K-palette og gates.</p>
+        <ul>
+          <li>Alle §1–§12 klikbare</li>
+          <li>Kommandopalette (⌘K)</li>
+          <li>Temaer · gates · config-eksport</li>
+        </ul>
+      </div>
+    </a>
+    <a class="card" href="nexus/concept-1-nexus-command-deck.html">
+      <div class="preview p1"><span class="pnum">KONCEPT 01 · HUD</span></div>
+      <div class="cbody">
+        <h2>NEXUS</h2>
+        <p class="tagline">Taktisk kommandobro — mørk, præcis, alt-i-sigt.</p>
+        <ul>
+          <li>Levende agent-loop pipeline</li>
+          <li>Verify-gate &amp; capability-grants</li>
+          <li>Model-router med budget i realtid</li>
+        </ul>
+      </div>
+    </a>
+    <a class="card" href="aura/concept-2-aura-glass.html">
+      <div class="preview p2"><span class="pnum">KONCEPT 02 · GLASS</span></div>
+      <div class="cbody">
+        <h2>AURA</h2>
+        <p class="tagline">Glas &amp; aurora — den venlige, elegante front mod motoren.</p>
+        <ul>
+          <li>Hukommelses-konstellation (canvas)</li>
+          <li>Opgavekort med verifikations-badges</li>
+          <li>Blur/glow/opacity justérbar live</li>
+        </ul>
+      </div>
+    </a>
+    <a class="card" href="atlas/concept-3-atlas-ledger.html">
+      <div class="preview p3"><span class="pnum">KONCEPT 03 · LEDGER</span></div>
+      <div class="cbody">
+        <h2>ATLAS</h2>
+        <p class="tagline">Redaktionel hovedbog — hver handling set, prissat, reversibel.</p>
+        <ul>
+          <li>Plan-træ + acceptance-kriterier</li>
+          <li>Cost ledger pr. step &amp; model</li>
+          <li>⌘K-kommandopalette til al konfiguration</li>
+        </ul>
+      </div>
+    </a>
+  </nav>
+
+  <div class="foot">
+    <span>Koncepter · ikke endelig kode</span>
+    <span>MMXXVI</span>
+  </div>
+</div>
+</body>
+</html>

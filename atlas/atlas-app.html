@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ATLAS · Agent Operations Ledger</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --paper:#f6f4ee;--ink:#191712;--mut:#7a756a;--rule:#d9d3c6;--rule2:#b9b2a2;
+  --acc:#b5301c;--good:#2e6b46;--warn:#9a6a00;
+  --serif:ui-serif,Georgia,'Times New Roman',serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:15px;
+  min-height:100vh;transition:background .25s,color .25s}
+body[data-theme=slate]{--paper:#242830;--ink:#e8eaee;--mut:#98a0ab;--rule:#3a4048;--rule2:#4c545e;--acc:#e05a3a}
+body[data-theme=noir]{--paper:#111110;--ink:#edece8;--mut:#8b897f;--rule:#2c2b27;--rule2:#3e3d37}
+.wrap{max-width:1220px;margin:0 auto;padding:0 28px 80px}
+.masthead{padding-top:26px}
+.rule-double{border-top:2.5px solid var(--ink);border-bottom:1px solid var(--ink);height:5px}
+.mast-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0 10px;cursor:pointer}
+.mast-title{font-size:36px;letter-spacing:.32em;font-weight:600;text-indent:.32em}
+.mast-title span{color:var(--acc)}
+.mast-right{display:flex;align-items:center;gap:16px;font-family:var(--mono);font-size:11px;color:var(--mut)}
+.bmeter{width:90px;height:5px;border:1px solid var(--rule2)}
+.bmeter i{display:block;height:100%;background:var(--good);transition:width .6s}
+.gate-badge{padding:3px 11px;border:1px solid var(--acc);color:var(--acc);
+  letter-spacing:.14em;cursor:pointer;background:none;font-family:var(--mono);font-size:11px}
+.gate-badge:hover{background:var(--acc);color:var(--paper)}
+.mast-sub{text-align:center;font-style:italic;color:var(--mut);font-size:13px;padding-bottom:10px}
+.mast-meta{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;
+  color:var(--mut);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  padding:7px 2px;letter-spacing:.06em;text-transform:uppercase}
+.mast-meta b{color:var(--ink);font-weight:500}
+
+/* ── SECTION NAV ─────────────────────────── */
+.secnav{display:flex;flex-wrap:wrap;border-bottom:2px solid var(--ink);position:relative;z-index:20}
+.secnav>div{position:relative}
+.navbtn{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;
+  background:none;border:0;border-right:1px dotted var(--rule);color:var(--mut);
+  padding:11px 12px;cursor:pointer;display:flex;gap:6px;align-items:center;position:relative}
+.navbtn:first-child{border-left:1px dotted var(--rule)}
+.navbtn b{color:var(--acc);font-weight:500}
+.navbtn:hover,.navbtn.on{color:var(--ink);background:linear-gradient(180deg,transparent 60%,rgba(181,48,28,.09))}
+.navbtn.on::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--acc)}
+.dropdown{position:absolute;top:100%;left:0;min-width:280px;background:var(--paper);
+  border:1px solid var(--ink);box-shadow:6px 6px 0 rgba(0,0,0,.14);display:none;z-index:30}
+.dropdown.open{display:block}
+.dropdown button{display:block;width:100%;text-align:left;background:none;border:0;
+  border-bottom:1px dotted var(--rule);padding:9px 16px;font-family:var(--serif);
+  font-size:13.5px;color:var(--ink);cursor:pointer}
+.dropdown button:last-child{border-bottom:0}
+.dropdown button small{display:block;font-family:var(--mono);font-size:9.5px;
+  color:var(--mut);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+.dropdown button:hover{background:var(--acc);color:#fff}
+.dropdown button:hover small{color:rgba(255,255,255,.75)}
+<style>
+/* ── PAGE LAYOUT ─────────────────────────── */
+.pagegrid{display:grid;grid-template-columns:230px 1fr;min-height:400px}
+.subnav{border-right:1px solid var(--rule);padding:22px 18px 22px 0}
+.subnav .sh{font-family:var(--mono);font-size:10px;letter-spacing:.24em;color:var(--mut);
+  text-transform:uppercase;margin-bottom:14px;padding-left:10px}
+.subnav button{display:flex;gap:9px;width:100%;text-align:left;background:none;border:0;
+  font-family:var(--serif);font-size:14px;color:var(--ink);padding:8px 10px;cursor:pointer;
+  border-left:2px solid transparent}
+.subnav button .no{font-family:var(--mono);font-size:10px;color:var(--mut);width:32px;flex-shrink:0;padding-top:2px}
+.subnav button:hover{background:rgba(181,48,28,.05)}
+.subnav button.on{border-left-color:var(--acc);font-weight:600}
+.subnav button.on .no{color:var(--acc)}
+article{padding:26px 2px 26px 34px;animation:fadein .25s}
+@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.crumb{font-family:var(--mono);font-size:10.5px;letter-spacing:.22em;color:var(--mut);
+  text-transform:uppercase;display:flex;gap:10px;margin-bottom:10px}
+.crumb b{color:var(--acc);font-weight:500}
+h2.art{font-size:30px;font-weight:550;margin-bottom:8px}
+.lede{font-style:italic;color:var(--mut);font-size:15.5px;line-height:1.6;max-width:62ch;margin-bottom:16px}
+.spec{line-height:1.7;max-width:68ch;margin-bottom:12px}
+.bullets{list-style:none;max-width:66ch;margin:6px 0 18px}
+.bullets li{padding:9px 0 9px 26px;position:relative;border-bottom:1px dotted var(--rule);line-height:1.55}
+.bullets li::before{content:'—';position:absolute;left:0;color:var(--acc)}
+.stub{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--acc);border:1px dashed var(--acc);
+  padding:5px 12px;margin-top:6px}
+.stub::before{content:'';width:6px;height:6px;background:var(--acc);border-radius:50%}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:14px;margin-top:8px}
+.card{border:1px solid var(--rule2);padding:16px;cursor:pointer;background:transparent;
+  text-align:left;font-family:inherit;color:inherit;transition:.15s}
+.card:hover{border-color:var(--acc);box-shadow:4px 4px 0 rgba(181,48,28,.15)}
+.card .cno{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--acc)}
+.card h4{font-size:15.5px;font-weight:600;margin:6px 0}
+.card p{font-size:13px;color:var(--mut);line-height:1.5;font-style:italic}
+<style>
+/* ── STATUSBAR · PALETTE · TOAST ─────────── */
+.statusbar{position:fixed;left:0;right:0;bottom:0;background:var(--paper);
+  border-top:1px solid var(--rule);z-index:40}
+.statusbar .inner{max-width:1220px;margin:0 auto;padding:7px 28px;display:flex;
+  gap:16px;align-items:center;font-family:var(--mono);font-size:10px;color:var(--mut)}
+.chip{white-space:nowrap}
+.chip b{color:var(--acc);font-weight:500;margin-right:5px}
+.sb-right{margin-left:auto;display:flex;gap:16px}
+kbd{border:1px solid var(--rule2);padding:1px 7px;border-radius:3px;font-family:var(--mono);
+  box-shadow:0 2px 0 var(--rule2);font-size:10px}
+.pal-ov{position:fixed;inset:0;background:rgba(20,17,12,.35);backdrop-filter:blur(3px);
+  z-index:90;display:none;justify-content:center;padding-top:11vh}
+.pal-ov.open{display:flex}
+.pal{width:min(600px,92vw);height:fit-content;background:var(--paper);border:1px solid var(--ink);
+  box-shadow:8px 8px 0 rgba(0,0,0,.2);animation:palin .16s ease-out}
+@keyframes palin{from{transform:translateY(-8px);opacity:0}}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--rule);background:transparent;
+  padding:15px 18px;font-family:var(--serif);font-size:17px;color:var(--ink);outline:none}
+.pal input::placeholder{color:var(--mut);font-style:italic}
+.pal ul{list-style:none;max-height:340px;overflow-y:auto}
+.pal li{display:flex;justify-content:space-between;align-items:center;padding:10px 18px;
+  cursor:pointer;font-size:14.5px;border-bottom:1px dotted var(--rule)}
+.pal li .cat{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.pal li.sel{background:var(--acc);color:#fff}
+.pal li.sel .cat{color:rgba(255,255,255,.75)}
+.pal .pfoot{padding:7px 18px;font-family:var(--mono);font-size:10px;color:var(--mut);border-top:1px solid var(--rule)}
+.toast{position:fixed;bottom:44px;left:50%;transform:translateX(-50%) translateY(90px);
+  background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:12px;
+  padding:11px 22px;z-index:99;transition:transform .3s;letter-spacing:.05em}
+.toast.show{transform:translateX(-50%) translateY(0)}
+@media(max-width:860px){.pagegrid{grid-template-columns:1fr}.subnav{border-right:0;border-bottom:1px solid var(--rule);display:flex;flex-wrap:wrap;padding-left:10px}.subnav .sh{width:100%}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="pal-ov" id="palOv">
+  <div class="pal">
+    <input id="palIn" placeholder="Gå til sektion, skift tema, ændr gates…" autocomplete="off"/>
+    <ul id="palList"></ul>
+    <div class="pfoot">↑↓ navigér · ↵ udfør · esc luk</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="masthead">
+    <div class="rule-double"></div>
+    <div class="mast-row" id="mastRow">
+      <div class="mast-title">ATL<span>A</span>S</div>
+      <div class="mast-right">
+        <span>BUDGET <span id="budTxt">$4.20/$12</span></span>
+        <span class="bmeter"><i id="budBar" style="width:35%"></i></span>
+        <button class="gate-badge" id="gateBadge">VERIFY GATES · STRICT</button>
+      </div>
+    </div>
+    <div class="mast-sub">Agent Operations Ledger — hver handling set, prissat &amp; reversibel</div>
+    <div class="mast-meta">
+      <span>SESSION <b>№8841</b></span>
+      <span id="mDate"></span>
+      <span>RUNTIME <b id="uptime">00:00:00</b></span>
+      <span><kbd>⌘K</kbd></span>
+    </div>
+  </header>
+
+  <nav class="secnav" id="secnav"></nav>
+  <main id="main"></main>
+</div>
+
+<footer class="statusbar"><div class="inner">
+  <span class="chip"><b>CAPS</b></span>
+  <span id="sbCaps"></span>
+  <span class="sb-right">
+    <span class="chip" id="sbJobs">2 baggrundsjob kørende</span>
+    <span class="chip" style="cursor:pointer" id="sbPal">⌘K palette</span>
+  </span>
+</div></footer>
+<script>
+'use strict';
+/* ── config ──────────────────────────────── */
+var DEF={theme:'paper',accent:'#b5301c',density:'comfortable',gates:'strict',sec:'forsiden',sub:null};
+var cfg=load();
+function load(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem('atlas_app_cfg')||'{}'))}catch(e){return JSON.parse(JSON.stringify(DEF))}}
+function save(){localStorage.setItem('atlas_app_cfg',JSON.stringify(cfg))}
+function apply(){
+  if(cfg.theme==='paper')document.body.removeAttribute('data-theme');
+  else document.body.dataset.theme=cfg.theme;
+  if(cfg.density==='compact')document.body.dataset.density='compact';
+  else document.body.removeAttribute('data-density');
+  document.documentElement.style.setProperty('--acc',cfg.accent);
+  gateBadge.textContent='VERIFY GATES · '+cfg.gates.toUpperCase();
+  mDate.textContent=new Date().toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+function cycleGates(){var o=['strict','advisory','draft'];
+  cfg.gates=o[(o.indexOf(cfg.gates)+1)%3];save();apply();
+  toast('Verify gates: '+cfg.gates.toUpperCase());}
+
+/* ── informationsarkitektur: sektioner ───── */
+var SECTIONS=[];
+SECTIONS.push(
+{key:'forsiden',no:'I',name:'Forsiden',tag:'Morning Edition',
+ lede:'Dagens tilstand i avis-form: hvad er der hændt, hvor står agenten, hvad venter på dig.',
+ subs:[
+ {no:'1.1',t:'Dagens posteringer',d:'De vigtigste ledger-hændelser siden sidst, kronologisk ført med tidsstempel og pris.',b:['Kronologisk hændelsesbog med filtrering','Klik på en postering → fuld kontekst + replay-link','Prissat pr. hændelse']},
+ {no:'1.2',t:'Aktive planer',d:'Miniature-træer for hver kørende plan med status, blokeringer og estimeret restomkostning.',b:['Status pr. node: done / running / blocked','Estimeret resterende budget pr. plan','Ét klik åbner planen i §2']},
+ {no:'1.3',t:'Økonomi-søjlen',d:'Forbrug i dag/uge/måned op imod budgetter — routing-besparelser fremhævet.',b:['Spejler budgetmeteren i mastheadet','Routing-besparelser som egen linje','Prognose for månedens slutning']},
+ {no:'1.4',t:'Ledeartiklen',d:'Systemets status-redaktør: én genereret tekst om hvor agenten står, hvad der blokerer, hvad den beder om lov til.',b:['Genereres af critic-modellen','Linker direkte til de underliggende beviser','Vises kun når der er noget væsentligt at melde']}]},
+{key:'planer',no:'II',name:'Planer & Opgaver',tag:'Ledger of Intent',
+ lede:'Alt agenten har sat sig for — som versionerede, checkbare kontrakter.',
+ subs:[
+ {no:'2.1',t:'Aktiv plan',d:'Træet fra prototypen: dybde, status-markører, blokeringsårsager og pris per node.',b:['Node-status ✓ ◈ ▮ · med spin-animation','Blokeringsårsag skrevet af agenten selv','Acceptkriterier koblet til hver node']},
+ {no:'2.2',t:'Acceptkriterier & Gates',d:'Kontrakten: hvert kriterie med verifier-metode, seneste resultat og attest.',b:['Verifier-metoder: tests, sec-scan, critic, chaos-drill','PASS/FAIL-historik pr. kriterie','Ingen commit uden grønne gates (i strict)']},
+ {no:'2.3',t:'Planhistorik',d:'Versionerede plan-diffs — hvordan planen ændrede sig og hvorfor.',b:['Hver ændring er en postering med begrundelse','Diff mellem vilkårlige versioner','Gendan tidligere planversion']},
+ {no:'2.4',t:'Kø & skemalagte',d:'Durable workflows der overlever process-nedbrud — resume-punkt markeret midt i opgaven.',b:['Checkpoint/resume midt i hver opgave','Afhængigheder mellem jobs','Prioritering og deadlock-detektion']},
+ {no:'2.5',t:'Blokeret-board',d:'Alt der venter på menneske, credentials eller eksterne systemer — med nudge-knap.',b:['Grupperet efter hvem der skylder handling','Nudge via valgt leveringskanal','Eskalationsregler efter ventetid']}]}
+);
+SECTIONS.push(
+{key:'hukommelse',no:'III',name:'Hukommelse',tag:'Memory Ledger',
+ lede:'Hybrid-recall med gennemsigtige scores — Hermes\' 2.200-tegns MEMORY.md erstattes af et ført regnskab.',
+ subs:[
+ {no:'3.1',t:'Episoder',d:'Tidslinje over hvad agenten oplevede og lærte, med kilde-link tilbage til den oprindelige session.',b:['Tidslinje med tags (projekt, miljø, fejl)','Hver episode kan spores til sin kilde','Importance-score styrer decay']},
+ {no:'3.2',t:'Fakta & Regler',d:'Semantiske fakta med confidence-score, kilder og sidste-verificeret dato.',b:['Modstridende fakta flagges automatisk','Regler generaliseret af konsolideringen','Verificeringsdato pr. faktum']},
+ {no:'3.3',t:'Konsolidering',d:'Log over baggrundskørsler: deduplikering, generalisering og decay-kandidater.',b:['Merges kræver godkendelse — eller auto efter politik','Før/efter-visning af hver konsolidering','Decay arkiverer, sletter aldrig']},
+ {no:'3.4',t:'Brugerprofil',d:'Dine præferencer og arbejdskontekst — redigerbar direkte her.',b:['Redigér enhver profilpost manuelt','Se hvilke beslutninger profilen har påvirket','Isoleret pr. agent-profil']},
+ {no:'3.5',t:'Glemsel',d:'Søg og tilbagekald specifik viden permanent — audit-logget sletning.',b:['Fuld søgning på tværs af episoder og fakta','Sletning logget uforanderligt','Eksport før sletning']},
+ {no:'3.6',t:'Recall-tester',d:'"Spørg hukommelsen": se hvilke entries der retrieves på et spørgsmål — og hvorfor.',b:['Score-gennemsigtighed: semantisk / nøgleord / recency','Vægte tunes live','Regressionstest af recall-kvalitet']}]},
+{key:'kontekst',no:'IV',name:'Kontekst',tag:'Folding Room',
+ lede:'Tabsfri kontekststyring: intet summarizeres væk — det foldes og kan altid folkes ud igen.',
+ subs:[
+ {no:'4.1',t:'Aktuel kontekst',d:'Vinduesvisning: hvad er i konteksten nu, hvad er foldet, token-budget pr. kategori.',b:['Kategori-budgetter: system / historik / værktøjsresultater','Foldede regioner vist som citationstokens','Live token-tæller mod tærskel']},
+ {no:'4.2',t:'Fold-arkiv',d:'Alle folds med hierarkiske summeringer — Rehydrér trækker originalen tilbage on demand.',b:['Rehydrér enkeltfold eller hele regioner','Hierarki: fold af fold ved lange sessioner','Cache-venlig placering i tail']},
+ {no:'4.3',t:'Fold-politik',d:'Adaptive grænser pr. opgavetype: debug beholder rå historik, research komprimerer tidligt.',b:['Politikker pr. opgavetype med sliders','Automatisk valg ud fra planens genre','Manuel override pr. session']}]},
+{key:'verifikation',no:'V',name:'Verifikation',tag:'The Proof Desk',
+ lede:'Intet resultat er færdigt før det er bevist. Gates konverterer "agenten mener" til "det er tjekket".',
+ subs:[
+ {no:'5.1',t:'Gate-tilstande',d:'Strict / advisory / draft — globalt eller pr. domæne (kode=strict, research=advisory…).',b:['Badge i mastheadet skifter global tilstand','Per-domæne politikker','Draft = log-only under eksperimenter']},
+ {no:'5.2',t:'Gate-kørsler',d:'Pass/fail-historik med hele retry-kæden synlig: fra første fejl til endelig success.',b:['Retry-kæder visualiseret som graf','Tid og omkostning pr. gate-kørsel','Alarm ved gentagne fejlkilder']},
+ {no:'5.3',t:'Kriteriebibliotek',d:'Genbrugelige checks: test-suite, linter, sec-scan, kildekritik, critic-model — med parametre.',b:['Komponerbare checks pr. opgavetype','Parametre og tolerancer pr. check','Deles mellem profiler']},
+ {no:'5.4',t:'Attester',d:'Critic-modellens signaturer: hvilken model godkendte hvad — og med hvilken begrundelse.',b:['Signatur: model + dato + rationale','Attesteren følger artefaktet fremover','Kan kræves af eksterne forbrugere']}]}
+);
+SECTIONS.push(
+{key:'oekonomi',no:'VI',name:'Økonomi',tag:'Cost Ledger',
+ lede:'Regnskabet fra prototypen, udvidet til fuldt bogværk: routing-analyse, budgetlofter og prognose.',
+ subs:[
+ {no:'6.1',t:'Posteringer',d:'Live-tabellen: tid, step, model, tokens, cache-hit-rate og pris — filtrérbar på alle kolonner.',b:['Sticky totals-række','Filter pr. model/step/tidsrum','CSV- og JSON-eksport']},
+ {no:'6.2',t:'Routing-analyse',d:'Local vs. frontier-fordeling; hver eskalation med score-begrundelse.',b:['Score-grænse justérbare live','Kontrafaktisk: "hvad havde frontier kostet?"','Fordeling over tid som kurver']},
+ {no:'6.3',t:'Budgetter & lofter',d:'Lofter pr. dag/uge/opgave/subagent — med fastlagt handlingsregel ved overskridelse.',b:['Handlingsregel: nedskaler → spørg → stop','Advarsler ved 70/90 %','Per-subagent kvoter']},
+ {no:'6.4',t:'Prognose',d:'"Denne plan vil koste ~$2,40 mere" — løbende estimat ud fra historik for lignende steps.',b:['Estimat pr. aktiv plan','Nøjagtighedshistorik (calibrering)','Advarsel hvis estimat sprænger loftet']}]},
+{key:'sikkerhed',no:'VII',name:'Sikkerhed',tag:'Warrants & Writs',
+ lede:'Capability-model i stedet for regex-godkendelse: agenten ansøger om rettigheder, du udsteder warrants med udløb.',
+ subs:[
+ {no:'7.1',t:'Aktive grants',d:'Scope-chips med nedtælling (fs:read, net:get, shell:sandbox…) — udsteder og begrænsninger synlige.',b:['Nedtælling pr. grant, auto-udløb','Hvert grant bundet til en plan','Indsnævr eller tilbagekald når som helst']},
+ {no:'7.2',t:'Ansøgninger',d:'Når agenten mangler rettighed, indgiver den en ansøgning: hvad, hvorfor, hvor længe.',b:['Godkend / Afvis / Indsnævr med ét klik','Ansøgningens begrundelse lænket til plan-node','Genbrugelige svar ("altid tillad i dette repo")']},
+ {no:'7.3',t:'Taint-register',d:'Utroværdige datastrømme (web, e-mail): hvilken tekst flyder hvor, hvilke injection-forsøg blev stoppet.',b:['Dataflow-sporing fra kilde til tool-kald','Injection-forsøg logget med bevis','Politik: tainted tekst kræver re-godkendelse før høj-effekt handling']},
+ {no:'7.4',t:'Audit-log',d:'Uforanderlig, eksportérbar fuld historik over enhver beslutning og handling.',b:['Append-only, hash-kædet','Eksportér til ekstern revision','Søgbar på tværs af sessioner']},
+ {no:'7.5',t:'Sandboxe',d:'MicroVM-status, images og netværksprofiler pr. backend.',b:['Statusside pr. sandbox (CPU, net, disk)','Netværksprofiler: default-deny med allowlist','Image-versioner med advisory-check']}]},
+{key:'faerdigheder',no:'VIII',name:'Færdigheder',tag:'Skills Press',
+ lede:'Skills som redaktionelt produkt — med kvalitetssikring, så selvforbedring ikke kan degenerere.',
+ subs:[
+ {no:'8.1',t:'Biblioteket',d:'Alle skills med version, forfatter (dig / agenten / hub) og seneste eval-score.',b:['Version + diff pr. skill','Forfatter og oprindelse vist','Eval-score som badge']},
+ {no:'8.2',t:'Trykkeriet',d:'Agentens forslag til nye/ændrede skills som diffs — godkend, redigér eller afvis før publicering.',b:['Diff-visning med gist','Staging indtil godkendelse','Auto-publicering kan slås til pr. skill']},
+ {no:'8.3',t:'Regressionstests',d:'Hver skill har eval-cases; en auto-redigering der falder i score rulles automatisk tilbage.',b:['Eval-cases redigerbare','Score-tærskel for rollback','Historik over alle kørsler']},
+ {no:'8.4',t:'Tilladelser',d:'Hvilke capabilities en skill kræver ved kørsel — mindste-privilegium pr. skill.',b:['Erklærede grants pr. skill','Afvigelser flagges ved kørsel','Skill uden erklæring køler i draft']}]}
+);
+SECTIONS.push(
+{key:'automatik',no:'IX',name:'Automatik',tag:'Standing Orders',
+ lede:'Fastlagte ordrer: rutiner og triggere der kører uden dig — men aldrig uden gates.',
+ subs:[
+ {no:'9.1',t:'Rutiner',d:'Cron som agent-opgaver (natlig backup-audit osv.) med egne gate-politikker.',b:['Naturlig-sprog definition af hver rutine','Gate-politik pr. rutine (default: deny farlige)','Seneste kørsel + resultat']},
+ {no:'9.2',t:'Watchers',d:'Triggere: filændring, CI-fejl, ny e-mail → start plan.',b:['Declarative triggere med cooldown','Hver trigger lænket til en plan-skabelon','Kvote mod trigger-storms']},
+ {no:'9.3',t:'Kørehistorik & levering',d:'Resultatet af hver kørsel og hvor det blev leveret (CLI, mail, chat).',b:['Leveringskanal pr. rutine','Fail-silent aldrig: manglende levering er en alarm','Historik med replay']}]},
+{key:'sessioner',no:'X',name:'Sessioner',tag:'Back Issues',
+ lede:'Alt der nogensinde er kørt — søgbart, afspilbart, reversibelt.',
+ subs:[
+ {no:'10.1',t:'Arkivet',d:'Søgbart, tagget overblik over alle tidligere sessioner.',b:['Fuldtekst- og semantisk søgning','Tags pr. projekt/opgavetype','Krydsreference til memory-posteringer']},
+ {no:'10.2',t:'Replay',d:'Deterministisk afspilning af enhver session — step for step med kontekst og beslutninger synlige.',b:['Play/pause/step gennem hele forløbet','Beslutningspunkter fremhævet med "hvorfor"','Del et bestemt tidspunkt som permalink']},
+ {no:'10.3',t:'Checkpoints & rollback',d:'Snapshots før store tiltag; gendan til ethvert checkpoint.',b:['Auto-checkpoint før destruktive steps','Rollback viser hvad der gendannes','Checkpoints kan navngives og fastlåses']},
+ {no:'10.4',t:'Eksport',d:'Trajectories til træning eller deling — ShareGPT-format m.m.',b:['Formatvalg ved eksport','Anonymisering af secrets','Licensvalg på delte trajectories']}]},
+{key:'evaluering',no:'XI',name:'Evaluering',tag:'Proofs & Corrections',
+ lede:'Agenten måles, ikke mistænkes: benchmarks, A/B-retssal og et fejlkatalog der vokser klogere.',
+ subs:[
+ {no:'11.1',t:'Benchmark-suite',d:'Regressionsdetektion: kører ved hver ændring af prompts/skills/modeller — kurver over tid.',b:['Automatisk kørsel ved config-ændring','Kurve pr. opgavekategori','Alarm ved signifikant fald']},
+ {no:'11.2',t:'A/B-retssalen',d:'Sammenstil to varianter (prompt, skill, model) på samme opgavesæt og lad dommerne afgøre.',b:['Blinded bedømmelse af critic-model','Statistisk usikkerhed vist','Vinderen kan promoveres til default']},
+ {no:'11.3',t:'Fejlkataloget',d:'Dokumenterede failure-modes og hvilken lås der blev indført mod hver.',b:['Fejlklasser med eksempler fra rigtige kørsler','Lås (gate/regel/skill) koblet til hver klasse','Gentagelsesrate før/efter lås']}]},
+{key:'indstillinger',no:'XII',name:'Indstillinger',tag:'Imprint',
+ lede:'Hele systemet konfigurerbart tre steder fra: palette, paneler og YAML — samme kilde.',
+ subs:[
+ {no:'12.1',t:'Trykkeriet',d:'Tema (Paper/Slate/Noir), accentfarve, densitet og kolonnevalg.',b:['Live-preview ved valg','Gemmes lokalt pr. browser','Nulstil til fabriksopsætning']},
+ {no:'12.2',t:'Modeller',d:'Udbydere, routing-regler (hvornår escaleres) og pris-tabel.',b:['Routing-score-grænse justérbare','Priser pr. model redigerbare','Fallback-kæder pr. opgavetype']},
+ {no:'12.3',t:'Profiler',d:'Flere isolerede agent-profiler med egne ledgers, hukommelser og grants.',b:['Skift profil i mastheadet','Profil-distribution: del en hel agent','Kryds-profil-adgang kræver warrant']},
+ {no:'12.4',t:'Integrationer',d:'MCP-servere, messaging-platforme og webhooks.',b:['MCP-tool-filtering pr. server','Kanal-allowlists','Webhook-signering']},
+ {no:'12.5',t:'Config som kode',d:'Hele opsætningen som YAML med import/eksport og git-versionering.',b:['Palette ↔ paneler ↔ YAML er samme config','Diff-visning ved import','Validering før anvendelse']}]}
+);
+/* ── rendering ───────────────────────────── */
+var state={sec:'forsiden',sub:null};
+function getSec(k){for(var i=0;i<SECTIONS.length;i++)if(SECTIONS[i].key===k)return SECTIONS[i];return SECTIONS[0]}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+
+function renderNav(){
+  var el=document.getElementById('secnav');el.innerHTML='';
+  SECTIONS.forEach(function(S){
+    var wrap=document.createElement('div');
+    var btn=document.createElement('button');
+    btn.className='navbtn'+(state.sec===S.key?' on':'');
+    btn.innerHTML='<b>'+S.no+'</b> '+esc(S.name);
+    var dd=document.createElement('div');dd.className='dropdown';
+    var ov=document.createElement('button');
+    ov.innerHTML='Oversigt<small>'+esc(S.tag)+'</small>';
+    ov.onclick=function(e){e.stopPropagation();goto(S.key,null)};
+    dd.appendChild(ov);
+    S.subs.forEach(function(sub){
+      var b=document.createElement('button');
+      b.innerHTML=esc(sub.t)+'<small>'+sub.no+'</small>';
+      b.onclick=function(e){e.stopPropagation();goto(S.key,sub.no)};
+      dd.appendChild(b);});
+    btn.onclick=function(e){
+      e.stopPropagation();
+      var wasOpen=dd.classList.contains('open');
+      closeDrops();
+      if(!wasOpen)dd.classList.add('open');};
+    wrap.appendChild(btn);wrap.appendChild(dd);el.appendChild(wrap);});
+}
+document.addEventListener('click',closeDrops);
+function closeDrops(){document.querySelectorAll('.dropdown.open').forEach(function(d){d.classList.remove('open')})}
+
+function goto(secKey,subNo){
+  state.sec=secKey;state.sub=subNo;
+  cfg.sec=secKey;cfg.sub=subNo;save();
+  closeDrops();renderNav();renderPage();
+}
+
+function renderPage(){
+  var S=getSec(state.sec),main=document.getElementById('main');
+  var sn='<aside class="subnav"><div class="sh">'+S.no+' · '+esc(S.tag)+'</div>'+
+    '<button class="'+(state.sub?'':'on')+'" data-sub="">Oversigt</button>';
+  S.subs.forEach(function(sub){
+    sn+='<button class="'+(state.sub===sub.no?'on':'')+'" data-sub="'+sub.no+'">'+
+        '<span class="no">'+sub.no+'</span>'+esc(sub.t)+'</button>';});
+  sn+='</aside>';
+
+  var art;
+  if(!state.sub){
+    art='<article><div class="crumb"><b>'+S.no+'</b><span>·</span><span>'+esc(S.name)+'</span></div>'+
+     '<h2 class="art">'+esc(S.name)+'</h2>'+
+     '<p class="lede">'+esc(S.lede)+' <em>Sektionen indeholder '+S.subs.length+' undermenuer:</em></p>'+
+     '<div class="cards">'+S.subs.map(function(sub){
+       return '<button class="card" data-goto="'+sub.no+'"><span class="cno">'+sub.no+'</span>'+
+        '<h4>'+esc(sub.t)+'</h4><p>'+esc(sub.d.slice(0,72))+'…</p></button>';}).join('')+'</div></article>';
+  }else{
+    var sub=null;S.subs.forEach(function(x){if(x.no===state.sub)sub=x});
+    if(!sub){state.sub=null;cfg.sub=null;save();return renderPage();}
+    art='<article><div class="crumb"><b>'+S.no+'</b><span>·</span><span>'+esc(S.name)+
+     '</span><span>·</span><span>'+sub.no+'</span></div>'+
+     '<h2 class="art">'+esc(sub.t)+'</h2>'+
+     '<span class="stub">Stub — specifikation, motor tilsluttes senere</span>'+
+     '<p class="lede" style="margin-top:14px">'+esc(sub.d)+'</p>'+
+     '<ul class="bullets">'+sub.b.map(function(x){return '<li>'+esc(x)+'</li>'}).join('')+'</ul></article>';
+  }
+  main.innerHTML='<div class="pagegrid">'+sn+art+'</div>';
+  main.querySelectorAll('.subnav button').forEach(function(b){
+    b.onclick=function(){goto(state.sec,b.dataset.sub||null)};});
+  main.querySelectorAll('[data-goto]').forEach(function(c){
+    c.onclick=function(){goto(state.sec,c.dataset.goto)};});
+}
+/* ── command palette ─────────────────────── */
+var CMDS=[];
+SECTIONS.forEach(function(S){
+  CMDS.push({n:'Gå til — '+S.name,c:'navigation',f:function(){goto(S.key,null)}});
+  S.subs.forEach(function(sub){
+    CMDS.push({n:'Gå til — '+S.name+' · '+sub.t,c:'navigation',f:function(){goto(S.key,sub.no)}});});
+});
+CMDS=CMDS.concat([
+ {n:'Tema — Paper',c:'udseende',f:function(){cfg.theme='paper';done('Paper-tema')}},
+ {n:'Tema — Slate',c:'udseende',f:function(){cfg.theme='slate';done('Slate-tema')}},
+ {n:'Tema — Noir',c:'udseende',f:function(){cfg.theme='noir';done('Noir-tema')}},
+ {n:'Accent — Crimson',c:'udseende',f:function(){cfg.accent='#b5301c';done('Crimson-accent')}},
+ {n:'Accent — Cobalt',c:'udseende',f:function(){cfg.accent='#2456a6';done('Cobalt-accent')}},
+ {n:'Accent — Olive',c:'udseende',f:function(){cfg.accent='#556b2f';done('Olive-accent')}},
+ {n:'Densitet — Comfortable',c:'udseende',f:function(){cfg.density='comfortable';done('Comfortable')}},
+ {n:'Densitet — Compact',c:'udseende',f:function(){cfg.density='compact';done('Compact')}},
+ {n:'Gates — Strict',c:'verifikation',f:function(){cfg.gates='strict';done('Gates: STRICT')}},
+ {n:'Gates — Advisory',c:'verifikation',f:function(){cfg.gates='advisory';done('Gates: ADVISORY')}},
+ {n:'Gates — Draft (log-only)',c:'verifikation',f:function(){cfg.gates='draft';done('Gates: DRAFT')}},
+ {n:'Eksportér konfiguration som JSON',c:'system',f:function(){
+    var j=JSON.stringify(cfg,null,2);
+    if(navigator.clipboard&&navigator.clipboard.writeText)
+      navigator.clipboard.writeText(j).then(function(){done('Config kopieret')},function(){done(j)});
+    else done(j);}}]);
+var sel=0,filtered=CMDS;
+function done(msg){save();apply();closePal();toast(msg);}
+function openPal(){palOv.classList.add('open');palIn.value='';filter();palIn.focus();}
+function closePal(){palOv.classList.remove('open');}
+function filter(){var q=palIn.value.toLowerCase();
+  filtered=CMDS.filter(function(c){return c.n.toLowerCase().indexOf(q)>-1});
+  sel=0;renderPal();}
+function renderPal(){
+  palList.innerHTML=filtered.slice(0,40).map(function(c,i){
+    return '<li data-i="'+i+'" class="'+(i===sel?'sel':'')+'"><span>'+esc(c.n)+'</span><span class="cat">'+c.c+'</span></li>';}).join('')
+    ||'<li><span style="color:var(--mut)">Ingen match</span></li>';
+  palList.querySelectorAll('li[data-i]').forEach(function(li){
+    li.onclick=function(){filtered[+li.dataset.i].f()};});
+  var s=palList.querySelector('.sel');if(s)s.scrollIntoView({block:'nearest'});}
+palIn.oninput=filter;
+palIn.onkeydown=function(e){
+  if(e.key==='ArrowDown'){sel=Math.min(Math.min(filtered.length,40)-1,sel+1);renderPal();e.preventDefault();}
+  else if(e.key==='ArrowUp'){sel=Math.max(0,sel-1);renderPal();e.preventDefault();}
+  else if(e.key==='Enter'&&filtered[sel]){filtered[sel].f();}};
+palOv.addEventListener('click',function(e){if(e.target===palOv)closePal()});
+document.addEventListener('keydown',function(e){
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();
+    palOv.classList.contains('open')?closePal():openPal();}
+  else if(e.key==='Escape'){closePal();closeDrops();}});
+sbPal.onclick=openPal;
+gateBadge.onclick=cycleGates;
+
+/* ── statusbar: capability grants ────────── */
+var CAPS=[['fs:read','~/projects',900],['net:get','api.github.com',600],['shell:sandbox','µVM',1500]];
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+CAPS.forEach(function(c){var sp=document.createElement('span');sp.className='chip';
+  sp.innerHTML='<b>'+c[0]+'</b>'+fmt(c[2]);c.sp=sp;sbCaps.appendChild(sp);});
+setInterval(function(){CAPS.forEach(function(c){if(c[0]){c[2]--;
+  c.sp.innerHTML='<b>'+c[0]+'</b>'+fmt(c[2]);}})},1000);
+
+/* ── toast & timers ──────────────────────── */
+var toastTimer=null;
+function toast(msg){var t=document.getElementById('toast');t.textContent=msg;
+  t.classList.add('show');clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){t.classList.remove('show')},2200);}
+var sec=0;
+setInterval(function(){sec++;
+  uptime.textContent=String(Math.floor(sec/3600)).padStart(2,'0')+':'+
+    String(Math.floor(sec/60)%60).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');},1000);
+
+/* ── init ────────────────────────────────── */
+if(!getSec(cfg.sec))cfg.sec='forsiden';
+state.sec=cfg.sec;
+var S=getSec(state.sec);
+state.sub=(cfg.sub&&S.subs.some(function(x){return x.no===cfg.sub}))?cfg.sub:null;
+apply();renderNav();renderPage();
+
+</script>
+</body>
+</html>
