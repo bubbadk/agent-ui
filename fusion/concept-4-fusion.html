@@ -395,6 +395,7 @@ function renderTree(){tree.innerHTML=TREE.map(function(n){
    '<span class="ti">'+n.t+'</span><span class="st">'+n.s+'</span></div>';}).join('');}
 renderTree();
 setInterval(function(){
+  if(window.__ATLAS_LIVE__)return;
   var i=TREE.findIndex(function(n){return n.s==='running'});
   if(i>-1&&Math.random()<0.45)TREE[i].s='done';
   else{var p=TREE.findIndex(function(n){return n.s==='pending'||n.s==='blocked'});
@@ -417,7 +418,7 @@ var LINES=[
  ['tg-ok','plan ledger synced · step 7.3 done'],
  ['tg-sec','taint scan → 0 untrusted flows into tool calls']];
 var conEl=document.getElementById('console');
-function push(){var L=LINES[Math.floor(Math.random()*LINES.length)],now=new Date();
+function push(){if(window.__ATLAS_LIVE__)return;var L=LINES[Math.floor(Math.random()*LINES.length)],now=new Date();
   var d=document.createElement('div');d.className='ln';
   var t=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
   d.innerHTML='<span class="t">'+t+'</span> ';
@@ -426,11 +427,11 @@ function push(){var L=LINES[Math.floor(Math.random()*LINES.length)],now=new Date
   conEl.appendChild(d);
   while(conEl.children.length>60)conEl.removeChild(conEl.firstChild);
   conEl.scrollTop=conEl.scrollHeight;}
-function loopPush(){push();setTimeout(loopPush,1500);}
+function loopPush(){if(window.__ATLAS_LIVE__)return;push();setTimeout(loopPush,1500);}
 /* ── cost ledger ─────────────────────────── */
 var STEPS=['plan','retrieve','impl:oidc-callback','fold ctx','route→local','impl:refresh','tests:e2e','verify:gate','critic review'];
 var totCost=0;
-function ledgerRow(){
+function ledgerRow(){if(window.__ATLAS_LIVE__)return;
   var model=Math.random()<0.62?'LOCAL-8B':'FRONTIER';
   var tk=model==='LOCAL-8B'?800+Math.floor(Math.random()*2500):3000+Math.floor(Math.random()*9000);
   var cost=model==='LOCAL-8B'?tk*0.0000006:tk*0.000009;totCost+=cost;
@@ -458,7 +459,7 @@ var CRITS=[['47 legacy sessions survive migration','tests:int'],
  ['Rollback within ≤60s (measured)','chaos-drill'],
  ['Critic approves — no regressions','critic-v0']];
 var ci=0;
-function addCrit(){if(ci>=CRIT.length)return;
+function addCrit(){if(window.__ATLAS_LIVE__)return;if(ci>=CRIT.length)return;
   var ok=Math.random()>0.15,li=document.createElement('li');
   li.innerHTML='<span style="color:'+(ok?'var(--good)':'var(--bad)')+'">'+(ok?'✓':'✗')+'</span><span>'+CRITS[ci][0]+'</span>'+
    '<span class="st '+(ok?'pass':'fail')+'">'+(ok?'PASS':'RETRY')+' · '+CRITS[ci][1]+'</span>';
@@ -467,11 +468,12 @@ setTimeout(addCrit,800);setInterval(addCrit,4200);
 
 /* ── memory ring & router drift ──────────── */
 var pct=67,episN=1284,foldsN=47;
-setInterval(function(){pct=Math.max(52,Math.min(88,pct+(Math.random()*6-3)));
+setInterval(function(){if(window.__ATLAS_LIVE__)return;pct=Math.max(52,Math.min(88,pct+(Math.random()*6-3)));
   memPct.textContent=Math.round(pct)+'%';
   memRing.style.strokeDashoffset=283-(283*pct/100);},5000);
 var lp=62;
 setInterval(function(){
+  if(window.__ATLAS_LIVE__)return;
   lp=Math.max(44,Math.min(76,lp+(Math.random()*10-5)));
   rl.textContent=Math.round(lp)+'%';rf.textContent=Math.round(100-lp)+'%';},4000);
 setInterval(function(){episN+=Math.floor(Math.random()*3);foldsN+=Math.random()<0.3?1:0;
