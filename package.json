@@ -1,0 +1,12 @@
+{
+  "name": "agent-ui",
+  "private": true,
+  "description": "Atlas agent dashboard + engine",
+  "scripts": {
+    "start": "python3 server/server.py",
+    "test": "python3 -m unittest tests.test_engine && node tests/ui_test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

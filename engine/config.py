@@ -11,13 +11,14 @@ DEFAULTS = {
     'model': 'gpt-4o-mini',
     'api_key_env': 'OPENAI_API_KEY',
     'api_key': '',                           # optional key stored in config
+    'provider_key': 'openai',                # which vendor is selected in UI
     'gates': 'strict',                       # strict | advisory | draft
     'daily_budget': 12.0,
     'sub_budget': 0.5,
 }
 
 PERSIST_KEYS = ('provider', 'base_url', 'model', 'api_key_env', 'api_key',
-                'gates', 'daily_budget', 'sub_budget')
+                'gates', 'daily_budget', 'sub_budget', 'provider_key')
 
 
 def config_path():

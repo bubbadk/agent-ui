@@ -461,7 +461,7 @@ var CRITS=[['47 legacy sessions survive migration','tests:int'],
  ['Rollback within ≤60s (measured)','chaos-drill'],
  ['Critic approves — no regressions','critic-v0']];
 var ci=0;
-function addCrit(){if(window.__ATLAS_LIVE__)return;if(ci>=CRIT.length)return;
+function addCrit(){if(window.__ATLAS_LIVE__)return;if(ci>=CRITS.length)return;
   var ok=Math.random()>0.15,li=document.createElement('li');
   li.innerHTML='<span style="color:'+(ok?'var(--good)':'var(--bad)')+'">'+(ok?'✓':'✗')+'</span><span>'+CRITS[ci][0]+'</span>'+
    '<span class="st '+(ok?'pass':'fail')+'">'+(ok?'PASS':'RETRY')+' · '+CRITS[ci][1]+'</span>';

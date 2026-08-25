@@ -135,6 +135,7 @@ class Handler(BaseHTTPRequestHandler):
                 'base_url': CFG['base_url'],
                 'api_key_env': CFG['api_key_env'],
                 'api_key_set': bool(api_key(CFG)),
+                'provider_key': CFG.get('provider_key', 'openai'),
                 'daily_budget': float(CFG['daily_budget']),
                 'sub_budget': float(CFG.get('sub_budget', 0.5)),
                 'gates': CFG['gates'],
@@ -237,6 +238,10 @@ class Handler(BaseHTTPRequestHandler):
                 CFG['gates'] = body['gates']
             if 'api_key' in body and body['api_key']:
                 CFG['api_key'] = str(body['api_key'])
+            if body.get('api_key_clear'):
+                CFG['api_key'] = ''
+            if body.get('provider_key'):
+                CFG['provider_key'] = str(body['provider_key'])
             import config as config_mod
             config_mod.save(CFG)
             return self._send(200, json.dumps({

@@ -141,7 +141,8 @@
       '$' + s.budget.spent.toFixed(2) + '/$' + s.budget.limit.toFixed(0);
     el('budBar').style.width =
       Math.min(100, s.budget.spent / s.budget.limit * 100) + '%';
-    if (currentView !== 'dashboard') renderPage(s);
+    if (currentView !== 'dashboard' && currentView !== 'settings' &&
+        currentView !== 'memory') renderPage(s);
   }
 
   function renderEconomy(s) {
@@ -242,6 +243,22 @@
       'padding:8px 12px;border-radius:8px';
   }
 
+  var PROVIDERS = {
+    mock:      { label: 'Mock (demo brain, no key)', url: '', base: '', model: '' },
+    openai:    { label: 'OpenAI', url: 'https://platform.openai.com/api-keys', base: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    openrouter:{ label: 'OpenRouter (100+ models)', url: 'https://openrouter.ai/keys', base: 'https://openrouter.ai/api/v1', model: 'openrouter/auto' },
+    anthropic: { label: 'Anthropic (Claude)', url: 'https://console.anthropic.com/settings/keys', base: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4-20250514' },
+    gemini:    { label: 'Google Gemini', url: 'https://aistudio.google.com/app/apikey', base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.0-flash' },
+    groq:      { label: 'Groq (very fast, free tier)', url: 'https://console.groq.com/keys', base: 'https://api.groq.com/openai/v1', model: 'llama-3.3-70b-versatile' },
+    mistral:   { label: 'Mistral', url: 'https://console.mistral.ai/api-keys', base: 'https://api.mistral.ai/v1', model: 'mistral-large-latest' },
+    deepseek:  { label: 'DeepSeek', url: 'https://platform.deepseek.com/api_keys', base: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    xai:       { label: 'xAI (Grok)', url: 'https://console.x.ai', base: 'https://api.x.ai/v1', model: 'grok-3-mini' },
+    together:  { label: 'Together AI', url: 'https://api.together.xyz/settings/api-keys', base: 'https://api.together.xyz/v1', model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo' },
+    ollama:    { label: 'Ollama (local, free, no key)', url: 'https://ollama.com/download', base: 'http://localhost:11434/v1', model: 'llama3.2' },
+    lmstudio:  { label: 'LM Studio (local, free, no key)', url: 'https://lmstudio.ai', base: 'http://localhost:1234/v1', model: 'local-model' },
+    custom:    { label: 'Custom\u2026', url: '', base: '', model: '' }
+  };
+
   function renderSettings() {
     fetch('/api/config', { cache: 'no-store' })
       .then(function (r) { return r.json(); })
@@ -251,12 +268,18 @@
         pageEl.innerHTML = '<div class="glass card">' +
           '<h3 class="ct">ENGINE SETTINGS \u00b7 saved to ~/.agentui/config.json</h3>' +
           '<div class="crow"><div class="clab">Provider<small>' +
-          'MOCK = demo brain \u00b7 OPENAI_COMPAT = real AI (any compatible endpoint)</small></div>' +
-          '<div class="themebtns" id="provBtns">' +
-          ['mock', 'openai_compat'].map(function (p) {
-            return '<button class="tbtn' + (c.provider === p ? ' on' : '') +
-              '" data-v="' + p + '">' + p.toUpperCase() + '</button>';
-          }).join('') + '</div></div>' +
+          'pick one \u2014 base URL, model and key-link auto-fill</small></div>' +
+          '<select id="provSel" style="' + inputStyle() + 'width:260px">' +
+          Object.keys(PROVIDERS).map(function (k) {
+            return '<option value="' + k + '"' +
+              (sel === k ? ' selected' : '') + '>' +
+              esc(PROVIDERS[k].label) + '</option>';
+          }).join('') + '</select></div>' +
+          '<div class="crow"><div class="clab">Get API key<small>' +
+          'opens the provider\u2019s key page in a new tab</small></div>' +
+          '<a id="keyLink" href="#" target="_blank" rel="noopener" ' +
+          'style="font-family:var(--mono);font-size:12px;color:var(--acc);' +
+          'word-break:break-all"></a></div>' +
           '<div class="crow"><div class="clab">Model<small>' +
           'e.g. gpt-4o-mini, claude-sonnet-4, llama3 (local)</small></div>' +
           '<input id="cfgModel" value="' + esc(c.model) + '" style="' +
@@ -294,15 +317,35 @@
           '<div id="cfgMsg" style="font-family:var(--mono);font-size:12px;' +
           'margin-top:12px;color:var(--mut)"></div></div>';
 
-        var prov = c.provider, gates = c.gates;
-        el('provBtns').querySelectorAll('.tbtn').forEach(function (b) {
-          b.onclick = function () {
-            prov = b.dataset.v;
-            el('provBtns').querySelectorAll('.tbtn').forEach(function (x) {
-              x.classList.toggle('on', x === b);
-            });
-          };
-        });
+        var sel = 'custom';
+        if (c.provider === 'mock') sel = 'mock';
+        else if (c.provider_key && PROVIDERS[c.provider_key]) sel = c.provider_key;
+        else {
+          Object.keys(PROVIDERS).forEach(function (k) {
+            if (PROVIDERS[k].base &&
+                c.base_url.replace(/\/+$/, '') === PROVIDERS[k].base) sel = k;
+          });
+        }
+        function keyLink(fill) {
+          var p = PROVIDERS[el('provSel').value] || PROVIDERS.custom;
+          var a = el('keyLink');
+          if (p.url) {
+            a.href = p.url; a.textContent = p.url; a.style.display = '';
+          } else {
+            a.removeAttribute('href');
+            a.textContent = sel === 'mock'
+              ? '(mock needs no key)' : '(no key needed)';
+          }
+          if (fill && p.base) el('cfgBase').value = p.base;
+          if (fill && p.model) el('cfgModel').value = p.model;
+        }
+        el('provSel').onchange = function () {
+          sel = el('provSel').value;
+          keyLink(true);
+        };
+        keyLink(false);
+
+        var gates = c.gates;
         el('gateBtns').querySelectorAll('.tbtn').forEach(function (b) {
           b.onclick = function () {
             gates = b.dataset.v;
@@ -313,8 +356,10 @@
         });
 
         function save() {
+          var selV = el('provSel').value;
           var payload = {
-            provider: prov,
+            provider: selV === 'mock' ? 'mock' : 'openai_compat',
+            provider_key: selV,
             model: el('cfgModel').value.trim(),
             base_url: el('cfgBase').value.trim(),
             daily_budget: parseFloat(el('cfgBudget').value) || 12,
