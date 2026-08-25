@@ -52,15 +52,19 @@ PROCESSREGLER (brugerens krav, ingen undtagelser):
 4. Commit og push ALLE ændringer til github.com/bubbadk/agent-ui (main).
 5. Kommunikér med brugeren på dansk. UI er engelsk, manualen dansk.
 
-AKTUEL STATUS OG FØRSTE OPGAVE:
+AKTUEL STATUS:
 Cron / standing orders og durable task queue er allerede implementeret og
 pushet. Se HANDOVER.md §4.6.1 og §6 for commits `ba3a217`, `3e6fdc9` og
 `27ad307`. Implementér ikke disse features igen. Når verifikationen er grøn,
-følg backloggen i HANDOVER.md §7: først subagent-visualisering i SECURITY,
-derefter dybere Plans & Tasks. Præsenter en kort plan og få godkendelse før
-ny feature-implementering.
+er subagent-visualisering i SECURITY og dybere Plans & Tasks også implementeret.
+Task-historikken bevarer status, attempts, timestamps og fejl; failed tasks kan
+sendes til retry via `/api/tasks/retry`. SECURITY viser subagent-depth og
+grants/skills fra ledgeren. Cron bruger fortsat det validerede intervalformat.
+Ved nye features følges HANDOVER.md §7, og der præsenteres en kort plan før
+implementering.
 
 Status ved overdragelse: standing orders + durable task queue er færdige,
-seneste commit `27ad307`, alle tests grønne efter server-genstart, server
+køhistorik/retry og SECURITY-visualisering er færdige, alle tests grønne efter
+server-genstart, server
 kører på 8123, OpenRouter-nøgle er konfigureret via grafisk SETTINGS.
 ```

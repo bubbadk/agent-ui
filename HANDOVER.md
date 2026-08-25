@@ -3,7 +3,7 @@
 > **Dokumentens formål:** Komplet overdragelses-dokumentation. Enhver ny agent
 > (eller udvikler) skal kunne overtage projektet herfra uden at skulle gætte
 > noget. Denne fil er den autoritative kilde for en ny session.
-> Sidst opdateret: **standing orders + durable task queue, commit `27ad307`**
+> Sidst opdateret: **task history/retry + security visualisering**
 > (25. aug 2026).
 
 ---
@@ -262,10 +262,10 @@ Alle REST-routes i `server/server.py`:
 
 ## 7. Hvad MANGLER (backlog — aftalt med brugeren, i prioriteret rækkefølge)
 
-1. **Subagent-visualisering i SECURITY-view** — subagent-depth/grants findes i
-   ledgeren men vises ikke grafisk endnu.
-2. **Dybere Plans & Tasks** — udbyg task-kø-listing i UI med kørende/kø/
-   afsluttede tasks, historik, fejlstatus og eventuelle retry-kontroller.
+1. **Subagent-visualisering i SECURITY-view** — IMPLEMENTERET: SECURITY viser
+   subagent-status, depth og grants/skills fra ledgerens subagent-events.
+2. **Dybere Plans & Tasks** — IMPLEMENTERET: durable records bevares med status,
+   timestamps, attempts og fejltekst; failed tasks kan retries via UI.
 3. **Cron-semantik** — overvej kalenderbaseret cron/timezone i stedet for det
    nuværende intervalformat, hvis brugeren specifikt ønsker "hver morgen".
 
@@ -273,9 +273,9 @@ Alle REST-routes i `server/server.py`:
 - **Rig LLM-kørsel**: OpenRouter-nøgle ER konfigureret (via grafisk SETTINGS),
   men der mangler en end-to-end verificering af en RIGTIG task med rigtig
   model (indtil nu er reelle kørsler testet med mock + 401/403-paths).
-- **README.md er forældet**: skriver stadig "Status: v0.1" og viser kun
-  legacy-config uden providers/agents. Bør opdateres til v0.7 (eller pege på
-  denne fil + manualen).
+- **README.md**: opdateret til v0.8 og beskriver task history/retry samt
+  security-visualisering. Den autoritative driftsdokumentation er fortsat denne
+  fil.
 - `/mnt/iaasc` er root-ejet og skrivebeskyttet — projektet lever UDDELØST
   under `/home/bubbadk/agent-ui`. Kopier i `/mnt/iaasc` er forældede.
 - Port 8123 er hårdkodet i `server.py` — overvej CLI-arg/env, men 8787 må

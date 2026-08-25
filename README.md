@@ -3,7 +3,8 @@
 A self-hosted agent system front-end (the **Atlas / Fusion "Aurum Edition"**
 dashboard) plus a small, real **agent engine** behind it.
 
-> Status: v0.1 — engine runs fully offline with a deterministic mock provider;
+> Status: v0.8 — durable task execution, schedules, security telemetry and a
+> live task history; engine runs fully offline with a deterministic mock provider;
 > plug in any OpenAI-compatible API key to use a real model.
 
 ## Run it
@@ -21,7 +22,9 @@ Without the server, the HTML files are standalone design mockups.
 
 ## Use a real model
 
-Edit `~/.agentui/config.json`:
+Configure the provider through the dashboard's **SETTINGS** view (preferred),
+or use an environment variable referenced by the config. Never commit or print
+the actual key.
 
 ```json
 {
@@ -83,4 +86,16 @@ the ledger (its events are visible in the same timeline). Guardrails:
 
 ```bash
 python3 -m unittest tests.test_engine -v
+node tests/ui_test.mjs
 ```
+
+## Task operations
+
+Tasks are written to `data/task_queue.json` before execution. The Plans & Tasks
+view shows queued, running, completed and failed history, including attempts and
+safe error summaries; failed tasks can be queued again with **RETRY**. The
+Security view visualises capability grants and subagent depth/activity from the
+append-only ledger. Scheduled standing orders use bounded interval definitions
+configured in SETTINGS.
+
+For complete operational handover, see `HANDOVER.md`.

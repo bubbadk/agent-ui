@@ -57,7 +57,10 @@ def _load_queue():
         items = []
     for item in items:
         if isinstance(item, dict):
-            item['status'] = 'queued'
+            if item.get('status') in ('running', 'queued'):
+                item['status'] = 'queued'
+            else:
+                item['status'] = item.get('status', 'failed')
     TASK_QUEUE.extend(items)
     TASK_SEQ = max((int(x.get('id', 0)) for x in TASK_QUEUE
                     if str(x.get('id', '')).isdigit()), default=0)
@@ -73,7 +76,17 @@ def _save_queue():
 
 def _queue_view():
     with QUEUE_LOCK:
-        return [dict(x) for x in TASK_QUEUE]
+        return [dict(x) for x in reversed(TASK_QUEUE)]
+
+
+def _trim_queue():
+    """Keep active work plus a bounded, useful execution history."""
+    if len(TASK_QUEUE) > 100:
+        active = [x for x in TASK_QUEUE if x.get('status') in
+                  ('queued', 'running')]
+        history = [x for x in TASK_QUEUE if x.get('status') not in
+                   ('queued', 'running')][-100:]
+        TASK_QUEUE[:] = active + history
 
 
 def _enqueue_task(goal, source='manual'):
@@ -81,8 +94,9 @@ def _enqueue_task(goal, source='manual'):
     with QUEUE_LOCK:
         TASK_SEQ += 1
         item = {'id': TASK_SEQ, 'goal': goal[:2000], 'source': source,
-                'status': 'queued', 'created': time.time()}
+                'status': 'queued', 'created': time.time(), 'attempts': 0}
         TASK_QUEUE.append(item)
+        _trim_queue()
         _save_queue()
     LEDGER.append('TASK_QUEUED', detail={'task_id': item['id'],
                                          'goal': item['goal'],
@@ -91,12 +105,30 @@ def _enqueue_task(goal, source='manual'):
 
 
 def _task_worker(item):
+    task_id = item['id']
+    with QUEUE_LOCK:
+        current = next((x for x in TASK_QUEUE if x.get('id') == task_id), None)
+        if current:
+            current['started'] = time.time()
+            current['attempts'] = int(current.get('attempts', 0)) + 1
+            _save_queue()
     try:
         cfg = config_mod.effective_task_cfg(CFG)
-        Agent(cfg, LEDGER, MEMORY).run(item['goal'])
+        result = Agent(cfg, LEDGER, MEMORY).run(item['goal'])
+        status = 'completed' if result.get('status') == 'completed' else 'failed'
+        error = result.get('reason', '')
+    except Exception as exc:  # keep the durable record inspectable
+        status = 'failed'
+        error = str(exc)[:300]
     finally:
         with QUEUE_LOCK:
-            TASK_QUEUE[:] = [x for x in TASK_QUEUE if x.get('id') != item['id']]
+            current = next((x for x in TASK_QUEUE if x.get('id') == task_id), None)
+            if current:
+                current['status'] = status
+                current['finished'] = time.time()
+                if error:
+                    current['error'] = error
+                _trim_queue()
             _save_queue()
 
 
@@ -530,6 +562,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, '{"error":"invalid gates"}')
             CFG['gates'] = g
             return self._send(200, json.dumps({'ok': True, 'gates': g}))
+        if path == '/api/tasks/retry':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+                task_id = int(body.get('task_id'))
+            except (ValueError, TypeError):
+                return self._send(400, '{"error":"invalid task_id"}')
+            with QUEUE_LOCK:
+                original = next((x for x in TASK_QUEUE
+                                 if x.get('id') == task_id), None)
+            if not original:
+                return self._send(404, '{"error":"unknown task"}')
+            retry = _enqueue_task(original['goal'], source=original.get('source', 'manual'))
+            return self._send(200, json.dumps({'ok': True, 'task': retry}))
         if path != '/api/task':
             return self._send(404, '{"error":"not found"}')
         try:

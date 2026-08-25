@@ -485,15 +485,33 @@
       '<div class="glass card" style="margin-top:16px">' +
       '<h3 class="ct">TASK QUEUE · DURABLE EXECUTION</h3>' +
       ((s.queue || []).length ? (s.queue || []).map(function (q) {
-        var qm = q.status === 'running' ? '\u25c8' : '\u00b7';
-        return nodeRow(q.status, qm, q.goal,
-          q.source + ' · task #' + q.id, q.status);
+        var qm = q.status === 'running' ? '\u25c8' :
+          q.status === 'completed' ? '\u2713' : q.status === 'failed' ? '\u2717' : '\u00b7';
+        var age = q.finished ? new Date(q.finished * 1000).toLocaleTimeString() :
+          (q.created ? new Date(q.created * 1000).toLocaleTimeString() : '');
+        return '<div class="node ' + esc(q.status) + '">' +
+          '<span class="mk">' + qm + '</span><span class="ti">' + esc(q.goal) +
+          '<br><small style="color:var(--mut)">' + esc(q.source || 'manual') +
+          ' · task #' + q.id + ' · attempts ' + (q.attempts || 0) +
+          (age ? ' · ' + esc(age) : '') + (q.error ? ' · ' + esc(q.error) : '') +
+          '</small></span><span class="st">' + esc(q.status) +
+          (q.status === 'failed' ? ' <button class="tbtn" data-retry="' + q.id + '">RETRY</button>' : '') +
+          '</span></div>';
       }).join('') :
         '<p style="font-style:italic;color:var(--mut)">Task queue is empty.</p>') +
       '</div>' +
       '<div class="glass card" style="margin-top:16px">' +
       '<h3 class="ct">ACCEPTANCE CRITERIA \u00b7 LATEST GATE RUN</h3>' +
       critHtml + '</div>';
+    pageEl.querySelectorAll('[data-retry]').forEach(function (b) {
+      b.onclick = function () {
+        fetch('/api/tasks/retry', { method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ task_id: Number(b.dataset.retry) }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { toast(d.ok ? 'Task queued for retry' : 'Retry failed: ' + d.error); });
+      };
+    });
   }
 
   function renderMemory(d) {
@@ -584,6 +602,18 @@
     var denials = s.ledger.filter(function (e) {
       return e.kind === 'TOOL_RESULT' && e.detail && e.detail.ok === false;
     });
+    var subagents = s.ledger.filter(function (e) {
+      return e.kind === 'SUBAGENT_STARTED' || e.kind === 'SUBAGENT_FINISHED';
+    });
+    var subHtml = subagents.length ? subagents.map(function (e) {
+      var d = e.detail || {};
+      var depth = d.depth == null ? '?' : d.depth;
+      var grants = d.grants || d.skills || d.scope || 'inherited, scoped';
+      return nodeRow(e.kind === 'SUBAGENT_FINISHED' ? 'done' : 'running',
+        e.kind === 'SUBAGENT_FINISHED' ? '\u2713' : '\u25c8',
+        d.goal || d.name || 'subagent', 'depth ' + depth + ' · grants ' +
+        (typeof grants === 'string' ? grants : JSON.stringify(grants)), e.kind.replace('SUBAGENT_', '').toLowerCase());
+    }).join('') : '<p style="font-style:italic;color:var(--mut)">No subagent activity in the recent window.</p>';
     pageEl.innerHTML = '<div class="glass card">' +
       '<h3 class="ct">SECURITY \u00b7 ACTIVE CAPABILITY GRANTS</h3>' +
       (s.caps.length ? s.caps.map(function (c) {
@@ -591,6 +621,8 @@
           'live \u00b7 ' + c.left);
       }).join('') :
         '<p style="font-style:italic;color:var(--mut)">No active grants.</p>') +
+      '</div><div class="glass card" style="margin-top:16px">' +
+      '<h3 class="ct">SUBAGENTS · DEPTH &amp; GRANTS</h3>' + subHtml +
       '</div><div class="glass card" style="margin-top:16px">' +
       '<h3 class="ct">GRANT HISTORY</h3>' +
       (Object.keys(granted).length ?
