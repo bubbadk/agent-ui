@@ -2,7 +2,9 @@
 
 > **Dokumentens formål:** Komplet overdragelses-dokumentation. Enhver ny agent
 > (eller udvikler) skal kunne overtage projektet herfra uden at skulle gætte
-> noget. Sidst opdateret: **v0.7.1, commit `5753016`** (25. aug 2026).
+> noget. Denne fil er den autoritative kilde for en ny session.
+> Sidst opdateret: **standing orders + durable task queue, commit `27ad307`**
+> (25. aug 2026).
 
 ---
 
@@ -122,8 +124,11 @@ Alle REST-routes i `server/server.py`:
 | GET | `/api/agents` | Alle agenter + aktiv agent + gyldige provider_keys |
 | GET | `/api/memory[?q=]` | Episoder / nøgleordssøgning |
 | GET | `/api/task_events?start=ID` | Event-replay af én task (fra TASK_STARTED-id) |
-| POST | `/api/task` | Start ny task (afviser hvis én kører) — baggrundstråd |
+| GET | `/api/tasks` | Durable task queue-status |
+| GET | `/api/schedules` | Standing orders med næste kørsel |
+| POST | `/api/task` | Tilføj ny task til durable queue — baggrundsworker |
 | POST | `/api/config` | Gem settings (provider, model, base_url, budgetter, gates) |
+| POST | `/api/schedules` | Valider og gem standing orders |
 | POST | `/api/test_model` | Test-forbindelse (fejler læsbart på 401/403) |
 | POST | `/api/gates` | Skift gate runtime (strict/advisory/draft) |
 | POST | `/api/agents` | Opret agent (navn valideres `[a-z0-9][a-z0-9_-]{0,31}`) |
@@ -151,6 +156,24 @@ Alle REST-routes i `server/server.py`:
 - **AGENTS — grafisk agent-builder (v0.7, `517f396`)**: navn, provider, model
   (med live-liste), skills-checkboxes, persona-prompt; activate/delete;
   aktiv agent vises i masthead.
+
+### 4.6.1 Standing orders og durable execution (`ba3a217` → `3e6fdc9` → `27ad307`)
+- Config har `schedules: []`, som gemmes via `PERSIST_KEYS` i
+  `~/.agentui/config.json`.
+- Hver schedule normaliseres til `{id, goal, interval_seconds, enabled,
+  next_run}`. ID skal matche `[a-z0-9][a-z0-9_-]{0,31}`, goal er begrænset til
+  2000 tegn, og interval er mindst 1 sekund.
+- SETTINGS indeholder et JSON-felt for standing orders. **Kun SAVE-knappen**
+  skriver schedules; 2-sekunders-polleren må ikke overskrive formularen.
+- Scheduler-tråden kører hvert sekund. Due schedules lægges i den durable
+  queue og gentages efter `interval_seconds`. Disabled schedules ignoreres.
+- Queue gemmes atomisk i `data/task_queue.json`; queued tasks genindlæses ved
+  serverstart og kørende tasks markeres queued for sikker retry.
+- Scheduled queue entries har `source: "scheduled"` (manuel input har
+  `source: "manual"`). Der skrives `SCHEDULED_RUN` i ledgeren med schedule-id
+  og goal — aldrig credentials.
+- Der køres højst én task ad gangen ud fra `STATE['phase']`; øvrige tasks
+  venter i køen.
 
 ### 4.6 Bot Mode / multi-agent (v0.7)
 - **Provider-registry** i config: `providers.<key> = {base_url, model,
@@ -206,7 +229,11 @@ Alle REST-routes i `server/server.py`:
                 "skills": ["files","code","shell","web","subagents"],
                 "prompt": "persona..." }
   },
-  "active_agent": "<navn>"
+  "active_agent": "<navn>",
+  "schedules": [
+    { "id": "morning", "goal": "...", "interval_seconds": 86400,
+      "enabled": true, "next_run": 0 }
+  ]
 }
 ```
 
@@ -220,7 +247,10 @@ Alle REST-routes i `server/server.py`:
 | `714d333` | Settings resettede til "mock" | 2 s-poller overskrev formen mens man tastede → settings/agents/memory fritaget for poller; kun SAVE skriver |
 | (fanget af suite) | `CRIT` vs `CRITS`-typo | Fanget af jsdom-suiten |
 | (fanget af suite) | `UnboundLocalError` i `do_POST` | Fanget af suitten |
-| **`5753016`** (nyeste) | **"Model list failed: not found"** i SETTINGS | `/api/models` blev matchet med `self.path == '/api/models'`, men `self.path` INDLUDERER query-strengen (`?provider_key=...`) → faldt igennem til 404. **Fix:** match på `urlparse(self.path).path`. `urlparse` er nu importeret på modul-niveau, og de lokale `from urllib.parse import parse_qs, urlparse` i `/api/memory`- og `/api/task_events`-grene er fjernet (lokale imports skygger modul-navnet og giver `UnboundLocalError`). |
+| **`5753016`** | **"Model list failed: not found"** i SETTINGS | `/api/models` blev matchet med `self.path == '/api/models'`, men `self.path` INDLUDERER query-strengen (`?provider_key=...`) → faldt igennem til 404. **Fix:** match på `urlparse(self.path).path`. `urlparse` er nu importeret på modul-niveau, og de lokale `from urllib.parse import parse_qs, urlparse` i `/api/memory`- og `/api/task_events`-grene er fjernet (lokale imports skygger modul-navnet og giver `UnboundLocalError`). |
+| **`ba3a217`** | Cron/standing orders manglede | Tilføjede valideret schedule-config/UI, scheduler-tråd, `/api/schedules` og `SCHEDULED_RUN`. |
+| **`3e6fdc9`** | Tasks døde/blev afvist ved samtidighed eller restart | Tilføjede durable queue i `data/task_queue.json`, queue-worker, boot-recovery og `/api/tasks`. |
+| **`27ad307`** | Scheduled tasks havde forkert queue-provenance | `_run_scheduled()` sender nu `source='scheduled'` til queue; manuel task er fortsat `source='manual'`. |
 
 **Mønstre at huske:**
 1. `self.path` i `BaseHTTPRequestHandler` indeholder query-strengen — brug
@@ -232,15 +262,12 @@ Alle REST-routes i `server/server.py`:
 
 ## 7. Hvad MANGLER (backlog — aftalt med brugeren, i prioriteret rækkefølge)
 
-1. **Cron / standing orders** — planlagte opgaver (f.eks. "kør hver morgen").
-   Skitse: schedule-felt i config/UI + baggrundstråd i `server.py` der kalder
-   `Agent.run()` + ledger-entry `SCHEDULED_RUN`.
-2. **Task-kø + durable execution** — tasks skal overleve server-genstart
-   (persistér køen i `data/`, genoptag ved boot). I dag: nye tasks afvises
-   mens én kører, og en kørende task DØR ved genstart.
-3. **Subagent-visualisering i SECURITY-view** — subagent-depth/grants findes i
+1. **Subagent-visualisering i SECURITY-view** — subagent-depth/grants findes i
    ledgeren men vises ikke grafisk endnu.
-4. **Dybere Plans & Tasks** — task-kø-listing i UI (kørende/kø/afsluttede).
+2. **Dybere Plans & Tasks** — udbyg task-kø-listing i UI med kørende/kø/
+   afsluttede tasks, historik, fejlstatus og eventuelle retry-kontroller.
+3. **Cron-semantik** — overvej kalenderbaseret cron/timezone i stedet for det
+   nuværende intervalformat, hvis brugeren specifikt ønsker "hver morgen".
 
 ### Øvrige åbne punkter
 - **Rig LLM-kørsel**: OpenRouter-nøgle ER konfigureret (via grafisk SETTINGS),
@@ -265,7 +292,7 @@ Alle REST-routes i `server/server.py`:
 2. Læs §6 (bug-mønstre) — undgå at genindføre dem.
 3. Nye features: følg backlog-rækkefølgen i §7, eller spørg brugeren.
 4. Alle ændringer commites og pushes til `github.com/bubbadk/agent-ui`
-   (main). Seneste push: `5753016`.
+   (main). Seneste push: `27ad307`.
 5. Efter server-kodeændringer: genstart (`pkill -f 'server/server.py'`, start
    igen med nohup, log til `/tmp/atlas-server.log`) og kør BEGGE
    test-suitter igen.

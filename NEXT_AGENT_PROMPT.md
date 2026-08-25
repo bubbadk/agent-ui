@@ -14,6 +14,8 @@ START HER (obligatorisk, i denne rækkefølge):
 1. Læs /home/bubbadk/agent-ui/HANDOVER.md FULDT. Den er eneste kilde til
    sandhed og dækker: arkitektur, alle API-routes, alt færdigt arbejde pr.
    commit, config-format, bugfix-historik, backlog og overdragelses-checkliste.
+   Dokumentér selv alle nye ændringer i `.md`, så næste session kan overtage
+   uden mundtlig kontekst.
 2. Kør verifikationen i HANDOVER.md §2 og bekræft at ALT er grønt FØR du
    laver noget som helst andet:
    - curl http://127.0.0.1:8123/api/health          → {"ok": true, ...}
@@ -50,14 +52,15 @@ PROCESSREGLER (brugerens krav, ingen undtagelser):
 4. Commit og push ALLE ændringer til github.com/bubbadk/agent-ui (main).
 5. Kommunikér med brugeren på dansk. UI er engelsk, manualen dansk.
 
-DIN FØRSTE OPGAVE (når verifikationen er grøn):
-Backlog-punkt 1 fra HANDOVER.md §7: Cron / standing orders — planlagte
-opgaver. Skitse: schedule-felt i config/UI + baggrundstråd i server.py der
-kalder Agent.run() + ledger-entry SCHEDULED_RUN. Præsenter en kort plan for
-brugeren og få godkendelse FØR du implementerer. (Øvrige backlog-punkter i
-§7: task-kø + durable execution, subagent-visualisering i SECURITY,
-dybere Plans & Tasks.)
+AKTUEL STATUS OG FØRSTE OPGAVE:
+Cron / standing orders og durable task queue er allerede implementeret og
+pushet. Se HANDOVER.md §4.6.1 og §6 for commits `ba3a217`, `3e6fdc9` og
+`27ad307`. Implementér ikke disse features igen. Når verifikationen er grøn,
+følg backloggen i HANDOVER.md §7: først subagent-visualisering i SECURITY,
+derefter dybere Plans & Tasks. Præsenter en kort plan og få godkendelse før
+ny feature-implementering.
 
-Status ved overdragelse: v0.7.1, seneste commit 27344db, alle tests grønne,
-server kørende på 8123, OpenRouter-nøgle konfigureret via grafisk SETTINGS.
+Status ved overdragelse: standing orders + durable task queue er færdige,
+seneste commit `27ad307`, alle tests grønne efter server-genstart, server
+kører på 8123, OpenRouter-nøgle er konfigureret via grafisk SETTINGS.
 ```
