@@ -136,6 +136,48 @@ class EngineTest(unittest.TestCase):
         self.assertTrue(any(d.get('index') == 0 for d in steps),
                         'step 0 should be marked complete during the run')
 
+    def test_subagent_delegation(self):
+        """Report goals delegate research to a subagent and use its output."""
+        ws = tempfile.mkdtemp(prefix='atlas_sub_')
+        d = tempfile.mkdtemp()
+        led = Ledger(os.path.join(d, 'l.jsonl'))
+        mem = Memory(os.path.join(d, 'm.json'))
+        cfg = {'provider': 'mock', 'workspace': ws, 'gates': 'strict'}
+        res = Agent(cfg, led, mem).run('write a report about atlantis')
+        self.assertEqual(res['status'], 'completed')
+
+        kinds = [e['kind'] for e in led._entries()]
+        self.assertIn('SUBAGENT_STARTED', kinds)
+        self.assertIn('SUBAGENT_FINISHED', kinds)
+
+        report = os.path.join(ws, 'report.md')
+        self.assertTrue(os.path.exists(report))
+        with open(report, encoding='utf-8') as f:
+            content = f.read()
+        self.assertIn('atlantis', content.lower())
+        self.assertIn('Subagent research', content)
+
+        started = next(e for e in led._entries()
+                       if e['kind'] == 'SUBAGENT_STARTED')
+        self.assertEqual(started['detail']['depth'], 1)
+        shutil.rmtree(ws, ignore_errors=True)
+        shutil.rmtree(d, ignore_errors=True)
+
+    def test_subagent_depth_limit(self):
+        """A depth-2 agent must not spawn further subagents."""
+        ws = tempfile.mkdtemp(prefix='atlas_deep_')
+        d = tempfile.mkdtemp()
+        led = Ledger(os.path.join(d, 'l.jsonl'))
+        mem = Memory(os.path.join(d, 'm.json'))
+        cfg = {'provider': 'mock', 'workspace': ws, 'gates': 'advisory'}
+        res = Agent(cfg, led, mem, depth=2).run(
+            'write a report about deep recursion')
+        self.assertEqual(res['status'], 'completed')
+        kinds = [e['kind'] for e in led._entries()]
+        self.assertNotIn('SUBAGENT_STARTED', kinds)
+        shutil.rmtree(ws, ignore_errors=True)
+        shutil.rmtree(d, ignore_errors=True)
+
     def test_strict_gate_blocks_on_failure(self):
         ws = tempfile.mkdtemp(prefix='atlas_bad_')
         d = tempfile.mkdtemp()

@@ -61,11 +61,23 @@ tests/   test_engine.py          end-to-end self tests
 * Strict gates: a task is only COMMITTED if every acceptance check passes,
   otherwise it is BLOCKED and recorded as such.
 
-### Tools (v0.2)
+### Tools (v0.4)
 
-`set_plan` (publishes the plan shown in the UI) · `write_file` · `read_file` ·
-`list_dir` · `run_tests` (py-compile acceptance check) · `run_command`
-(allowlisted, sandboxed) · `web_fetch` (SSRF-guarded)
+`set_plan` (publishes the plan shown in the UI) · `complete_step` (marks plan
+progress) · `write_file` · `read_file` · `list_dir` · `run_tests` (py-compile
+acceptance check) · `run_command` (allowlisted, sandboxed) · `web_fetch`
+(SSRF-guarded) · `spawn_subagent` (delegation)
+
+### Subagents (v0.4)
+
+`spawn_subagent` runs a sub-goal through a fresh agent instance that shares
+the ledger (its events are visible in the same timeline). Guardrails:
+
+* **Depth limit**: max 2 levels — a subagent cannot spawn further subagents.
+* **Budget**: each subagent gets a cost cap (`sub_budget`, default $0.50);
+  exceeding it blocks the subagent and returns the reason to the parent.
+* The parent receives the child's summary as a tool result and uses it in
+  its own work (e.g. delegating research, then writing the report).
 
 ## Tests
 

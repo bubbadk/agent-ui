@@ -11,6 +11,19 @@ class MockProvider:
     name = 'mock-frontier'
 
     def chat(self, messages, tools=None):
+        # subagent children get a one-shot mock answer
+        if (messages and messages[0].get('role') == 'system'
+                and messages[0]['content'].startswith('[SUBAGENT')):
+            goal = ''
+            for m in messages:
+                if m.get('role') == 'user':
+                    goal = m['content']
+            return {'message': {'role': 'assistant', 'content':
+                'Subagent research complete for "%s". Mock findings: '
+                '3 data points gathered; a real model would browse and '
+                'cite sources here.' % goal[:80]},
+                'usage': {'prompt_tokens': 80, 'completion_tokens': 50}}
+
         goal = ''
         for m in messages:
             if m.get('role') == 'user':
@@ -20,6 +33,9 @@ class MockProvider:
 
         if any(w in gl for w in ('weather', 'vejr', 'forecast')):
             return self._weather(goal, messages, n)
+        if any(w in gl for w in ('report', 'delegate', 'research',
+                                 'rapport', 'undersøg')):
+            return self._report_flow(goal, messages, n)
         if any(w in gl for w in ('hello', 'module', 'script',
                                  'write', 'skriv', 'lav')):
             return self._hello_demo(n)
@@ -109,6 +125,58 @@ class MockProvider:
         return {'message': msg,
                 'usage': {'prompt_tokens': 90 + 30 * n,
                           'completion_tokens': 35}}
+
+    def _report_flow(self, goal, messages, n):
+        import re
+        m = re.search(r'(?:about|om)\s+(.+?)[\s?!.]*$', goal, re.IGNORECASE)
+        topic = (m.group(1) if m else 'the requested topic').strip()
+        if n == 0:
+            msg = {'role': 'assistant',
+                   'content': 'PLAN: delegate research, then write the report.',
+                   'tool_calls': [
+                       self._plan_call(['Delegate research to a subagent',
+                                        'Write report.md']),
+                       {'id': 'call_sub', 'type': 'function', 'function': {
+                           'name': 'spawn_subagent',
+                           'arguments': json.dumps(
+                               {'goal': 'gather key facts about ' + topic})}}]}
+        elif n == 1:
+            summary = ''
+            for x in messages:
+                if x.get('role') == 'tool':
+                    try:
+                        d = json.loads(x.get('content', ''))
+                    except ValueError:
+                        continue
+                    if isinstance(d, dict) and 'summary' in d:
+                        summary = d['summary']
+            report = ('# Report: %s\n\n%s\n\n'
+                      '_Compiled by Atlas agent (mock provider)._'
+                      % (topic, summary or 'No research returned.'))
+            msg = {'role': 'assistant',
+                   'content': 'Research returned. Writing report.md.',
+                   'tool_calls': [
+                       {'id': 'call_wf', 'type': 'function', 'function': {
+                           'name': 'write_file',
+                           'arguments': json.dumps(
+                               {'path': 'report.md', 'content': report})}},
+                       {'id': 'call_cs', 'type': 'function', 'function': {
+                           'name': 'complete_step',
+                           'arguments': json.dumps({'index': 0})}}]}
+        elif n == 2:
+            msg = {'role': 'assistant',
+                   'content': 'Report written; marking the last step done.',
+                   'tool_calls': [{'id': 'call_cs2', 'type': 'function',
+                                   'function': {'name': 'complete_step',
+                                                'arguments': json.dumps(
+                                                    {'index': 1})}}]}
+        else:
+            msg = {'role': 'assistant',
+                   'content': 'Done: report.md written using subagent '
+                              'research. All gates passed.'}
+        return {'message': msg,
+                'usage': {'prompt_tokens': 100 + 40 * n,
+                          'completion_tokens': 45}}
 
 
 class OpenAICompat:

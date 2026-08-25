@@ -31,6 +31,13 @@ SCHEMAS = [
         'parameters': {'type': 'object',
                        'properties': {'target': {'type': 'string'}}}}},
     {'type': 'function', 'function': {
+        'name': 'spawn_subagent',
+        'description': 'Delegate a self-contained sub-goal to a subagent. '
+                       'It runs with its own budget and returns a summary.',
+        'parameters': {'type': 'object',
+                       'properties': {'goal': {'type': 'string'}},
+                       'required': ['goal']}}},
+    {'type': 'function', 'function': {
         'name': 'complete_step',
         'description': 'Mark a plan step (0-based index, as given to set_plan) '
                        'as completed.',

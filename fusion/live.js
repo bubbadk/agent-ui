@@ -9,7 +9,8 @@
     TASK_STARTED: 'tg-mem', MODEL_CALL: 'tg-route', TOOL_CALL: 'tg-tool',
     TOOL_RESULT: 'tg-tool', CAPABILITY_GRANTED: 'tg-sec',
     VERIFY_RUN: 'tg-fold', COMMITTED: 'tg-ok',
-    TASK_COMPLETED: 'tg-ok', TASK_BLOCKED: 'tg-sec'
+    TASK_COMPLETED: 'tg-ok', TASK_BLOCKED: 'tg-sec',
+    SUBAGENT_STARTED: 'tg-route', SUBAGENT_FINISHED: 'tg-ok'
   };
   var MK = { done: '\u2713', running: '\u25c8', blocked: '\u25ae', pending: '\u00b7' };
   var seen = { consoleUpTo: 0, treeSig: '', tableSig: '', lastReply: 0 };
