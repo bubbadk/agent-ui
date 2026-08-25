@@ -190,6 +190,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.path.lstrip('/') or 'fusion/concept-4-fusion.html'
         if path == 'live.js':
             path = 'fusion/live.js'
+        if path == 'manual':
+            path = 'fusion/manual.html'
         fp = os.path.realpath(os.path.join(ROOT, path))
         if not fp.startswith(ROOT) or not os.path.isfile(fp):
             return self._send(404, '{"error":"not found"}')

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MANUAL · Atlas Agent System</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f0d13;--ink:#ebe6da;--mut:#8f887b;--rule:#2a2531;
+  --acc:#c8a24b;--good:#57c99b;--bad:#ff7373;
+  --glass:rgba(255,255,255,.055);--gborder:rgba(255,255,255,.13);
+  --serif:ui-serif,Georgia,serif;--mono:ui-monospace,Menlo,monospace;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--serif);
+  font-size:16px;line-height:1.7}
+body::before{content:'';position:fixed;inset:0;z-index:-1;opacity:.35;filter:blur(90px);
+  background:radial-gradient(ellipse 40% 30% at 80% -5%,rgba(91,63,168,.5),transparent),
+             radial-gradient(ellipse 35% 30% at 5% 105%,rgba(14,90,99,.45),transparent)}
+.wrap{max-width:920px;margin:0 auto;padding:40px 26px 90px}
+.toplink{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--mut);
+  text-decoration:none}
+.toplink:hover{color:var(--acc)}
+h1{font-size:40px;letter-spacing:.28em;font-weight:600;margin:14px 0 4px}
+h1 span{color:var(--acc)}
+.subtitle{font-style:italic;color:var(--mut);margin-bottom:26px}
+.rule-double{border-top:2.5px solid var(--ink);border-bottom:1px solid var(--ink);height:5px;margin:10px 0 0}
+.toc{background:var(--glass);border:1px solid var(--gborder);border-radius:14px;
+  padding:20px 26px;margin:26px 0;backdrop-filter:blur(14px)}
+.toc b{font-family:var(--mono);font-size:11px;letter-spacing:.28em;color:var(--acc);display:block;margin-bottom:10px}
+.toc a{display:block;color:var(--ink);text-decoration:none;padding:4px 0;font-size:15px}
+.toc a:hover{color:var(--acc)}
+.toc a small{color:var(--mut);font-family:var(--mono);font-size:11px;margin-left:10px}
+h2{font-size:26px;margin:46px 0 12px;padding-top:18px;border-top:1px solid var(--rule)}
+h2 .no{font-family:var(--mono);font-size:13px;color:var(--acc);margin-right:12px}
+h3{font-size:18px;margin:24px 0 8px}
+p{margin:10px 0;max-width:70ch}
+.lead{font-size:18px;font-style:italic;color:var(--mut);max-width:64ch}
+ul,ol{margin:10px 0 14px 24px;max-width:68ch}
+li{margin:5px 0}
+code{font-family:var(--mono);font-size:.88em;background:rgba(200,162,75,.13);
+  color:var(--acc);padding:1px 7px;border-radius:5px}
+pre{font-family:var(--mono);font-size:13px;background:rgba(0,0,0,.35);
+  border:1px solid var(--gborder);border-radius:10px;padding:14px 18px;
+  overflow-x:auto;margin:12px 0;line-height:1.6}
+.kort{background:var(--glass);border:1px solid var(--gborder);border-radius:14px;
+  padding:18px 24px;margin:16px 0}
+.kort b.t{font-family:var(--mono);font-size:11px;letter-spacing:.26em;color:var(--acc);display:block;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--mut);text-align:left;padding:8px 10px;border-bottom:2px solid var(--ink);font-weight:400}
+td{padding:8px 10px;border-bottom:1px dotted var(--rule);vertical-align:top}
+td:first-child{white-space:nowrap}
+.godt{border-left:3px solid var(--good);padding:10px 16px;margin:14px 0;
+  background:rgba(87,201,155,.07);border-radius:0 10px 10px 0}
+.advarsel{border-left:3px solid var(--bad);padding:10px 16px;margin:14px 0;
+  background:rgba(255,115,115,.07);border-radius:0 10px 10px 0}
+kbd{font-family:var(--mono);font-size:.85em;border:1px solid var(--gborder);
+  border-radius:4px;padding:1px 7px;box-shadow:0 2px 0 var(--gborder)}
+@media(max-width:700px){h1{font-size:28px}.wrap{padding:24px 18px 70px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<a class="toplink" href="/">← TILBAGE TIL DASHBOARDET</a>
+<h1>MANU<span>A</span>L</h1>
+<div class="subtitle">Atlas Agent System · dansk brugerguide · version 0.5</div>
+<div class="rule-double"></div>
+<nav class="toc">
+  <b>INDHOLD</b>
+  <a href="#s1">1 · Hvad er dette? <small>— det korte svar</small></a>
+  <a href="#s2">2 · Kom i gang på 1 minut</a>
+  <a href="#s3">3 · Dashboardet, felt for felt</a>
+  <a href="#s4">4 · Sådan bruger du agenten <small>— trin for trin</small></a>
+  <a href="#s5">5 · De syv menuer forklaret</a>
+  <a href="#s6">6 · Ordliste <small>— alle de mærkelige ord</small></a>
+  <a href="#s7">7 · Sikkerhed — hvad må agenten?</a>
+  <a href="#s8">8 · FAQ &amp; fejlfinding</a>
+  <a href="#s9">9 · Hvad ligger hvor? <small>— fil-kortet</small></a>
+</nav>
+
+<h2 id="s1"><span class="no">1</span>Hvad er dette?</h2>
+<p class="lead">Du har fået et <b>privat AI-agent-system</b>: en motor der kan
+udføre opgaver for dig, og et dashboard der viser <em>alt</em>, hvad den gør —
+hvad det kostede, om arbejdet blev verificeret, og hvad den husker fra sidst.</p>
+<p>Tænk på det som en medarbejder med et fuldstændigt kontor: Du lægger en seddel
+med en opgave ("skriv en rapport om X"), medarbejderen planlægger, arbejder, får
+sine handlinger godkendt af sikkerhedssystemet, skriver resultatet — og hele
+dagens arbejde føres i en hovedbog, du kan slå op bagefter.</p>
+<div class="advarsel"><b>Vigtig ærlighed:</b> "Hjernen" (sprogmodellen) kører i
+<strong>demo-mode</strong> ("mock") indtil du indsætter en API-nøgle fra fx OpenAI.
+Demo-hjernen kan tre ting: lave et hello-modul, hente <b>rigtig vejedata</b>, og
+skrive en rapport ved hjælp af en subagent. Alt andet omkring — planlægning,
+sikkerhed, regnskab, hukommelse, replay — er <strong>rigtig kode</strong> og virker nu.
+Sådan sættes rigtig AI til: se <a href="#s8">afsnit 8</a>.</div>
+
+<h2 id="s2"><span class="no">2</span>Kom i gang på 1 minut</h2>
+<ol>
+  <li>Åbn en terminal og skriv:<br>
+  <code>cd ~/agent-ui &amp;&amp; python3 server/server.py</code></li>
+  <li>Du ser <code>Atlas engine serving on http://localhost:8123</code></li>
+  <li>Åbn <code>http://localhost:8123</code> i din browser</li>
+  <li>Øverst står der <b>FUSION · LIVE ENGINE (mock)</b> — dashboardet er nu
+      koblet på motoren. Står der i stedet "AURUM EDITION", kører serveren ikke,
+      og siden er bare en pæn mockup.</li>
+</ol>
+<div class="kort"><b class="t">TIP</b>Serveren stoppes med <kbd>Ctrl</kbd>+<kbd>C</kbd>
+i terminalen. Kørende opgaver overlever ikke en genstart (endnu — "durable
+execution" ligger på tegnebrættet).</div>
+
+<h2 id="s3"><span class="no">3</span>Dashboardet, felt for felt</h2>
+<table>
+  <tr><th>Felt</th><th>Hvad det betyder</th></tr>
+  <tr><td><b>BUDGET</b></td><td>Hvad agenten har brugt af det løbende budget. I mock-mode koster alt 0 kr. — tallene viser bare systemet.</td></tr>
+  <tr><td><b>GATES · STRICT</b></td><td>Sikkerhedsniveau. <b>Strict</b>: resultatet tæller først, når alle tjek består. <b>Advisory</b>: advarer men tillader. <b>Draft</b>: logger kun. Klik på badge'et for at skifte.</td></tr>
+  <tr><td><b>Plan-træet</b> (venstre)</td><td>Agentens plan for den aktuelle opgave: ✓ = færdig, ◈ = kører nu, ▮ = blokeret, · = venter.</td></tr>
+  <tr><td><b>Live telemetry</b> (midt)</td><td>Agentens konsol — hver tanke, værktøjskald og hentning med tidsstempel.</td></tr>
+  <tr><td><b>AGENT REPLY</b></td><td>Kortet under inputfeltet: agentens <b>endelige svar</b>. Det er her, du skal kigge.</td></tr>
+  <tr><td><b>Cost ledger</b></td><td>Regnskabet: hvert model-kald og hver commit føres med tokens og pris.</td></tr>
+  <tr><td><b>Memory core</b> (højre)</td><td>Agentens hukommelse: hit-rate, antal gemte episoder og genåbnede "folds".</td></tr>
+  <tr><td><b>Verify gate</b></td><td>Kvalitetstjekket: kravene der skal bestå, før arbejdet tæller som færdigt.</td></tr>
+  <tr><td><b>Nederst: CAPS</b></td><td>Agentens midlertidige adgangskort (fillæsning, net, shell). De udløber selv.</td></tr>
+</table>
+
+<h2 id="s4"><span class="no">4</span>Sådan bruger du agenten</h2>
+<h3>Give en opgave</h3>
+<ol>
+  <li>Skriv i feltet <em>"Give the agent a goal…"</em> øverst i midten.</li>
+  <li>Tryk <b>RUN</b>.</li>
+  <li>Følg med i telemetrien og plan-træet — og læs svaret i <b>AGENT REPLY</b>.</li>
+</ol>
+<p>Prøv disse tre (de virker i demo-mode):</p>
+<ul>
+  <li><code>hvordan er vejret i nyborg</code> — henter <b>rigtig vejedata</b></li>
+  <li><code>write a hello module</code> — skriver og verificerer kode</li>
+  <li><code>write a report about atlantis</code> — delegerer research til en subagent og skriver rapporten ind i <code>workspace/report.md</code></li>
+</ul>
+<h3>Læse svaret</h3>
+<p>Svaret står i AGENT REPLY-kortet. Detaljerne (hvert enkelt trin) står i
+telemetrien, og i <b>SESSIONS</b>-menuen kan du trykke <b>⏵ REPLAY</b> og afspille
+hele forløbet trin for trin — som en video af agentens arbejde.</p>
+<h3>Se hvad det kostede</h3>
+<p>Klik <b>ECONOMY</b> i menuen. Hver eneste handling fører regnskab: model,
+antal tokens og pris. Totalen står også altid i mastheadet.</p>
+<h3>Søge i hukommelsen</h3>
+<p>Klik <b>MEMORY</b> og søg fx <code>vejr</code> eller <code>report</code> —
+agenten husker fuldførte opgaver og bruger dem selv som baggrund næste gang.</p>
+<h3>Skifte sikkerhedsniveau</h3>
+<p>Klik <b>VERIFICATION</b> og vælg STRICT / ADVISORY / DRAFT. Det skifter
+niveauet for alle fremtidige opgaver med det samme.</p>
+<h2 id="s5"><span class="no">5</span>De syv menuer forklaret</h2>
+<table>
+  <tr><th>Menu</th><th>Hvad den viser</th></tr>
+  <tr><td><b>OVERVIEW</b></td><td>Dashboardet du kender — alt samlet på én skærm.</td></tr>
+  <tr><td><b>PLANS &amp; TASKS</b></td><td>Den aktuelle plan i stor udgave + de seneste kvalitetstjek (acceptkriterier) med ✓/✗.</td></tr>
+  <tr><td><b>MEMORY</b></td><td>Agentens hukommelse: alle fuldførte opgaver som "episoder" — med søgefelt.</td></tr>
+  <tr><td><b>VERIFICATION</b></td><td>Kvalitetsgates: skift niveau og se historikken af tjek med ✓/✗ pr. krav.</td></tr>
+  <tr><td><b>ECONOMY</b></td><td>Det fulde regnskab: total, budget, fordeling pr. model og alle prisføre posteringer.</td></tr>
+  <tr><td><b>SECURITY</b></td><td>Hvad agenten har tilladelse til lige nu (med nedtælling), grant-historik og fejl/afvisninger.</td></tr>
+  <tr><td><b>SESSIONS</b></td><td>Opgavehistorik med status, pris og agentens slut-sammenfatning — plus <b>⏵ REPLAY</b>-knap der afspiller opgaven trin for trin.</td></tr>
+</table>
+<div class="kort"><b class="t">HUSK</b>Menuerne virker kun i LIVE ENGINE-mode.
+Uden serveren er hele siden en design-mockup med simulerede tal.</div>
+
+<h2 id="s6"><span class="no">6</span>Ordliste</h2>
+<table>
+  <tr><th>Ord</th><th>Betydning på dansk</th></tr>
+  <tr><td><b>Agent</b></td><td>Programmet der selv planlægger og udfører opgaver for dig ved at kalde værktøjer og en AI-model.</td></tr>
+  <tr><td><b>Mock / mock provider</b></td><td>En "øve-hjerne": en scriptet model så systemet kan demonstreres uden API-nøgle. Kan kun de forudlærte tricks.</td></tr>
+  <tr><td><b>Ledger</b> (hovedbogen)</td><td>Den tilføjelses-only fil (<code>data/ledger.jsonl</code>) hvor <em>hver eneste handling</em> føres: hver tanke, værktøjskald, tjek og pris.</td></tr>
+  <tr><td><b>Gate</b></td><td>Kvalitetsport. Før agenten må "committe" et resultat, skal kravene bestå (fx at koden kan kompileres). Strict / advisory / draft = hård / advarer / logger kun.</td></tr>
+  <tr><td><b>Capability / grant</b></td><td>Adgangskort. Agenten må <em>ingenting</em> som standard; den ansøger om rettigheder (læse filer, net, shell), og de udløber automatisk.</td></tr>
+  <tr><td><b>Plan-træ</b></td><td>Agentens opskrift på opgaven opdelt i trin med status.</td></tr>
+  <tr><td><b>Fold / kontekst</b></td><td>Ved lange opgaver arkiveres ældre samtale "tabsfrit" i et arkiv og kan hentes tilbage på anmodning — i stedet for at blive slettet.</td></tr>
+  <tr><td><b>Subagent</b></td><td>En hjælpe-agent som hoved-agenten kan hyre til en delopgave (fx research), med eget budget og dybdegrænse.</td></tr>
+  <tr><td><b>Verify gate / PASS</b></td><td>Beviset for at arbejdet er godt nok: tests, sikkerhedsscan, kritiker-model.</td></tr>
+  <tr><td><b>Replay</b></td><td>Afspilning af en hel opgave trin for trin, så du kan se <em>præcis</em> hvad der skete.</td></tr>
+  <tr><td><b>Workspace</b></td><td>Mappen <code>~/agent-ui/workspace/</code> — det <em>eneste</em> sted agenten må skrive filer.</td></tr>
+</table>
+<h2 id="s7"><span class="no">7</span>Sikkerhed — hvad må agenten?</h2>
+<ul>
+  <li><b>Default-deny:</b> Agenten må ingenting, før det er givet tilladelse. Hver tilladelse (fx <code>fs:write workspace/</code>) logges og udløber.</li>
+  <li><b>Kun workspace:</b> Fillæsning/skrivning er låst til <code>~/agent-ui/workspace/</code>. Udenfor? Afvist og logget.</li>
+  <li><b>Shell på allowlist:</b> Kun udvalgte programmer (ls, cat, grep, python3, git …) må køres — ingen shell-operatorer som <code>;</code> eller <code>|</code>, ingen netadgang.</li>
+  <li><b>Net med sikkerhedssele:</b> <code>web_fetch</code> må kun hente offentlige http(s)-adresser — din egen maskine og interne netværk er blokeret.</li>
+  <li><b>Subagenter under kontrol:</b> Max 2 niveauer dybt, eget budget pr. hjælper.</li>
+  <li><b>Alt logges:</b> Hver handling står i hovedbogen og kan afspilles igen med REPLAY.</li>
+</ul>
+<div class="godt"><b>Den korte version:</b> Agenten er en gæst med midlertidige
+adgangskort i et aflåst kontor, hvor alt, hvad den gør, skrives i protokollen.</div>
+
+<h2 id="s8"><span class="no">8</span>FAQ &amp; fejlfinding</h2>
+<h3>"Den siger, den er en mock og ikke kan …"</h3>
+<p>Det er demo-hjernen. Se "Hvordan får jeg rigtig AI ind" herunder.</p>
+<h3>Hvordan får jeg rigtig AI (ChatGPT-lignende) ind?</h3>
+<ol>
+  <li>Lav en API-nøgle hos fx OpenAI (platform.openai.com → API keys).</li>
+  <li>Opret filen <code>~/.agentui/config.json</code> med indholdet:</li>
+</ol>
+<pre>{
+  "provider": "openai_compat",
+  "model": "gpt-4o-mini",
+  "base_url": "https://api.openai.com/v1",
+  "api_key_env": "OPENAI_API_KEY"
+}</pre>
+<ol start="3">
+  <li>I terminalen: <code>export OPENAI_API_KEY="din-nøgle"</code> og start serveren igen.</li>
+</ol>
+<h3>"Port 8123 er optaget" / siden svarer ikke</h3>
+<p>Start serveren på en anden port: <code>python3 server/server.py 9000</code> —
+og åbn <code>localhost:9000</code> i stedet.</p>
+<h3>"Hvor gemmer agenten sine filer?"</h3>
+<p>Alt den skriver ligger i <code>~/agent-ui/workspace/</code>. Regnskabet ligger i
+<code>~/agent-ui/data/ledger.jsonl</code> og hukommelsen i
+<code>~/agent-ui/data/memory.json</code>.</p>
+<h3>"Siden blinker / tallene hopper"</h3>
+<p>Det var en fejl, vi allerede har rettet — genindlæs med
+<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd>.</p>
+<h3>"Hvad betyder PASS/FAIL i verify gate?"</h3>
+<p>Om agentens arbejde bestod kvalitetstjekket. FAIL i strict-mode betyder, at
+resultatet <em>ikke</em> blev godkendt som færdigt — agenten prøver igen, eller
+opgaven blokeres og vises som BLOCKED.</p>
+
+<h2 id="s9"><span class="no">9</span>Hvad ligger hvor?</h2>
+<table>
+  <tr><th>Sti</th><th>Hvad det er</th></tr>
+  <tr><td><code>~/agent-ui/</code></td><td>Hele projektet (også dit git-repo)</td></tr>
+  <tr><td><code>fusion/</code></td><td>Dashboardet (design + live-wiring + denne manual)</td></tr>
+  <tr><td><code>engine/</code></td><td>Motoren: agent-loop, værktøjer, hukommelse, regnskab</td></tr>
+  <tr><td><code>server/server.py</code></td><td>Programmet der forbinder motor og dashboard</td></tr>
+  <tr><td><code>workspace/</code></td><td>Agentens eneste skriveområde — dens "skrivebord"</td></tr>
+  <tr><td><code>data/</code></td><td>Hovedbogen og hukommelsen (bliver større med tiden)</td></tr>
+  <tr><td><code>tests/</code></td><td>Automatiske tests: <code>python3 -m unittest tests.test_engine</code></td></tr>
+  <tr><td><code>~/.agentui/config.json</code></td><td>Din opsætning (model, API-nøgle-navn)</td></tr>
+</table>
+<p style="margin-top:30px;color:var(--mut);font-style:italic">
+Manualen følger med systemet og opdateres, efterhånden som vi bygger videre.
+Sidst opdateret: v0.5.</p>
+
+</div>
+</body>
+</html>
