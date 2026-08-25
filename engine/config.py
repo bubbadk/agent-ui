@@ -10,13 +10,27 @@ DEFAULTS = {
     'base_url': 'https://api.openai.com/v1', # any OpenAI-compatible endpoint
     'model': 'gpt-4o-mini',
     'api_key_env': 'OPENAI_API_KEY',
+    'api_key': '',                           # optional key stored in config
     'gates': 'strict',                       # strict | advisory | draft
     'daily_budget': 12.0,
+    'sub_budget': 0.5,
 }
+
+PERSIST_KEYS = ('provider', 'base_url', 'model', 'api_key_env', 'api_key',
+                'gates', 'daily_budget', 'sub_budget')
 
 
 def config_path():
     return os.path.join(HOME, 'config.json')
+
+
+def save(cfg):
+    """Persist the user-facing subset of cfg to ~/.agentui/config.json."""
+    os.makedirs(HOME, exist_ok=True)
+    out = {k: cfg[k] for k in PERSIST_KEYS if k in cfg}
+    with open(config_path(), 'w', encoding='utf-8') as f:
+        json.dump(out, f, indent=2)
+    return out
 
 
 def load():
@@ -38,4 +52,6 @@ def load():
 
 
 def api_key(cfg):
-    return os.environ.get(cfg.get('api_key_env', ''), '')
+    """Env var wins; otherwise a key stored in the config file."""
+    return (os.environ.get(cfg.get('api_key_env', ''), '')
+            or cfg.get('api_key', ''))

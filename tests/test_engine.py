@@ -171,6 +171,27 @@ class EngineTest(unittest.TestCase):
         self.assertIn('vejret', hits[0]['goal'])
         self.assertEqual(self.memory.search('xyzzy nonexistent'), [])
 
+    def test_config_roundtrip(self):
+        """Graphical settings must persist to ~/.agentui/config.json."""
+        import config as cfgmod     # noqa: E402
+        old_home = cfgmod.HOME
+        tmp = tempfile.mkdtemp(prefix='atlas_cfg_')
+        cfgmod.HOME = tmp
+        try:
+            cfg = cfgmod.load()
+            cfg['model'] = 'test-model'
+            cfg['api_key'] = 'sk-test'
+            cfg['daily_budget'] = 25.0
+            cfgmod.save(cfg)
+            cfg2 = cfgmod.load()
+            self.assertEqual(cfg2['model'], 'test-model')
+            self.assertEqual(cfg2['api_key'], 'sk-test')
+            self.assertEqual(cfg2['daily_budget'], 25.0)
+            self.assertEqual(cfgmod.api_key(cfg2), 'sk-test')
+        finally:
+            cfgmod.HOME = old_home
+            shutil.rmtree(tmp, ignore_errors=True)
+
     def test_subagent_depth_limit(self):
         """A depth-2 agent must not spawn further subagents."""
         ws = tempfile.mkdtemp(prefix='atlas_deep_')

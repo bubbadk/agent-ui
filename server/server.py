@@ -128,6 +128,17 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if self.path == '/api/config':
+            return self._send(200, json.dumps({'ok': True, 'config': {
+                'provider': CFG['provider'],
+                'model': CFG['model'],
+                'base_url': CFG['base_url'],
+                'api_key_env': CFG['api_key_env'],
+                'api_key_set': bool(api_key(CFG)),
+                'daily_budget': float(CFG['daily_budget']),
+                'sub_budget': float(CFG.get('sub_budget', 0.5)),
+                'gates': CFG['gates'],
+            }}))
         if self.path == '/api/health':
             prov = CFG['provider']
             key_ok = bool(api_key(CFG)) or prov == 'mock'
@@ -201,6 +212,50 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read(), ctype)
 
     def do_POST(self):
+        if self.path == '/api/config':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            if body.get('provider') not in (None, 'mock', 'openai_compat'):
+                return self._send(400, '{"error":"invalid provider"}')
+            if body.get('gates') not in (None, 'strict', 'advisory', 'draft'):
+                return self._send(400, '{"error":"invalid gates"}')
+            for field in ('model', 'base_url'):
+                if field in body:
+                    CFG[field] = str(body[field]).strip() or CFG[field]
+            for field in ('daily_budget', 'sub_budget'):
+                if field in body:
+                    try:
+                        CFG[field] = max(0.0, float(body[field]))
+                    except (TypeError, ValueError):
+                        pass
+            if 'provider' in body:
+                CFG['provider'] = body['provider']
+            if 'gates' in body:
+                CFG['gates'] = body['gates']
+            if 'api_key' in body and body['api_key']:
+                CFG['api_key'] = str(body['api_key'])
+            import config as config_mod
+            config_mod.save(CFG)
+            return self._send(200, json.dumps({
+                'ok': True, 'provider': CFG['provider'],
+                'model': CFG['model'], 'gates': CFG['gates'],
+                'api_key_set': bool(api_key(CFG))}))
+        if self.path == '/api/test_model':
+            cfg = dict(CFG)
+            cfg['_api_key'] = api_key(CFG)
+            try:
+                from providers import make_provider
+                r = make_provider(cfg, cfg['_api_key']).chat(
+                    [{'role': 'user', 'content': 'Reply with exactly: OK'}])
+                reply = (r['message'].get('content') or '')[:80]
+                return self._send(200, json.dumps(
+                    {'ok': True, 'reply': reply}))
+            except Exception as exc:                  # noqa: BLE001
+                return self._send(200, json.dumps(
+                    {'ok': False, 'error': str(exc)[:300]}))
         if self.path == '/api/gates':
             try:
                 n = int(self.headers.get('Content-Length', 0))

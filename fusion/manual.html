@@ -195,17 +195,15 @@ adgangskort i et aflåst kontor, hvor alt, hvad den gør, skrives i protokollen.
 <h3>Hvordan får jeg rigtig AI (ChatGPT-lignende) ind?</h3>
 <ol>
   <li>Lav en API-nøgle hos fx OpenAI (platform.openai.com → API keys).</li>
-  <li>Opret filen <code>~/.agentui/config.json</code> med indholdet:</li>
+  <li>I dashboardet: klik <b>SETTINGS</b> i menuen.</li>
+  <li>Vælg provider <b>OPENAI_COMPAT</b>, indsæt nøglen i <b>API key</b>-feltet
+      og vælg model (fx <code>gpt-4o-mini</code>).</li>
+  <li>Tryk <b>TEST CONNECTION</b> — får du "Model replied: OK", er alt klar.
+      Tryk <b>SAVE SETTINGS</b>. Færdig.</li>
 </ol>
-<pre>{
-  "provider": "openai_compat",
-  "model": "gpt-4o-mini",
-  "base_url": "https://api.openai.com/v1",
-  "api_key_env": "OPENAI_API_KEY"
-}</pre>
-<ol start="3">
-  <li>I terminalen: <code>export OPENAI_API_KEY="din-nøgle"</code> og start serveren igen.</li>
-</ol>
+<div class="godt">Ingen JSON-filer — alt gemmes korrekt for dig, og nye indstillinger
+gælder fra næste opgave. (Avanceret alternativ: filen
+<code>~/.agentui/config.json</code> kan stadig redigeres i hånden.)</div>
 <h3>"Port 8123 er optaget" / siden svarer ikke</h3>
 <p>Start serveren på en anden port: <code>python3 server/server.py 9000</code> —
 og åbn <code>localhost:9000</code> i stedet.</p>

@@ -24,7 +24,8 @@
   function el(id) { return document.getElementById(id); }
   function esc(x) {
     return String(x == null ? '' : x)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;').replace(/>/g, '&gt;');
   }
 
   async function health() {
@@ -231,6 +232,131 @@
     else if (currentView === 'plans') renderPlans(s);
     else if (currentView === 'verification') renderVerification(s);
     else if (currentView === 'security') renderSecurity(s);
+    else if (currentView === 'security') renderSecurity(s);
+    else if (currentView === 'settings') renderSettings();
+  }
+
+  function inputStyle() {
+    return 'width:220px;background:none;border:1px solid var(--gborder);' +
+      'color:inherit;font-family:var(--mono);font-size:12px;' +
+      'padding:8px 12px;border-radius:8px';
+  }
+
+  function renderSettings() {
+    fetch('/api/config', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (currentView !== 'settings' || !pageEl) return;
+        var c = d.config;
+        pageEl.innerHTML = '<div class="glass card">' +
+          '<h3 class="ct">ENGINE SETTINGS \u00b7 saved to ~/.agentui/config.json</h3>' +
+          '<div class="crow"><div class="clab">Provider<small>' +
+          'MOCK = demo brain \u00b7 OPENAI_COMPAT = real AI (any compatible endpoint)</small></div>' +
+          '<div class="themebtns" id="provBtns">' +
+          ['mock', 'openai_compat'].map(function (p) {
+            return '<button class="tbtn' + (c.provider === p ? ' on' : '') +
+              '" data-v="' + p + '">' + p.toUpperCase() + '</button>';
+          }).join('') + '</div></div>' +
+          '<div class="crow"><div class="clab">Model<small>' +
+          'e.g. gpt-4o-mini, claude-sonnet-4, llama3 (local)</small></div>' +
+          '<input id="cfgModel" value="' + esc(c.model) + '" style="' +
+          inputStyle() + '"></div>' +
+          '<div class="crow"><div class="clab">Base URL<small>' +
+          'OpenAI-compatible endpoint</small></div>' +
+          '<input id="cfgBase" value="' + esc(c.base_url) + '" style="' +
+          inputStyle() + '"></div>' +
+          '<div class="crow"><div class="clab">API key<small>' +
+          (c.api_key_set ? 'a key is configured \u2014 paste to replace'
+                         : 'no key set \u2014 paste yours here') +
+          '</small></div><input id="cfgKey" type="password" placeholder="' +
+          (c.api_key_set ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : 'sk-...') +
+          '" style="' + inputStyle() + '"></div>' +
+          '<div class="crow"><div class="clab">Daily budget ($)<small>' +
+          'hard ceiling \u2014 engine warns and stops</small></div>' +
+          '<input id="cfgBudget" type="number" step="0.5" value="' +
+          c.daily_budget + '" style="' + inputStyle() + '"></div>' +
+          '<div class="crow"><div class="clab">Subagent budget ($)<small>' +
+          'per delegated helper</small></div>' +
+          '<input id="cfgSub" type="number" step="0.1" value="' +
+          c.sub_budget + '" style="' + inputStyle() + '"></div>' +
+          '<div class="crow"><div class="clab">Verify gates<small>' +
+          'strict = results must pass checks</small></div>' +
+          '<div class="themebtns" id="gateBtns">' +
+          ['strict', 'advisory', 'draft'].map(function (g) {
+            return '<button class="tbtn' + (c.gates === g ? ' on' : '') +
+              '" data-v="' + g + '">' + g.toUpperCase() + '</button>';
+          }).join('') + '</div></div>' +
+          '<div style="display:flex;gap:10px;margin-top:18px">' +
+          '<button class="tbtn" id="cfgTest" style="border-color:var(--acc);' +
+          'color:var(--acc)">TEST CONNECTION</button>' +
+          '<span style="flex:1"></span>' +
+          '<button class="tbtn on" id="cfgSave">SAVE SETTINGS</button></div>' +
+          '<div id="cfgMsg" style="font-family:var(--mono);font-size:12px;' +
+          'margin-top:12px;color:var(--mut)"></div></div>';
+
+        var prov = c.provider, gates = c.gates;
+        el('provBtns').querySelectorAll('.tbtn').forEach(function (b) {
+          b.onclick = function () {
+            prov = b.dataset.v;
+            el('provBtns').querySelectorAll('.tbtn').forEach(function (x) {
+              x.classList.toggle('on', x === b);
+            });
+          };
+        });
+        el('gateBtns').querySelectorAll('.tbtn').forEach(function (b) {
+          b.onclick = function () {
+            gates = b.dataset.v;
+            el('gateBtns').querySelectorAll('.tbtn').forEach(function (x) {
+              x.classList.toggle('on', x === b);
+            });
+          };
+        });
+
+        function save() {
+          var payload = {
+            provider: prov,
+            model: el('cfgModel').value.trim(),
+            base_url: el('cfgBase').value.trim(),
+            daily_budget: parseFloat(el('cfgBudget').value) || 12,
+            sub_budget: parseFloat(el('cfgSub').value) || 0.5,
+            gates: gates
+          };
+          var key = el('cfgKey').value.trim();
+          if (key) payload.api_key = key;
+          return fetch('/api/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }).then(function (r) { return r.json(); });
+        }
+        function msg(text, good) {
+          el('cfgMsg').textContent = text;
+          el('cfgMsg').style.color = good ? 'var(--good)' : 'var(--bad)';
+        }
+
+        el('cfgSave').onclick = function () {
+          save().then(function (d) {
+            if (d.ok) {
+              msg('Saved \u2713 \u2014 new tasks use these settings.', true);
+              health().then(function (h) {
+                if (h) document.querySelector('.edition').textContent =
+                  'FUSION \u00b7 LIVE ENGINE (' + h.provider + ')';
+              });
+            } else { msg('Error: ' + (d.error || 'unknown'), false); }
+          });
+        };
+        el('cfgTest').onclick = function () {
+          msg('Testing\u2026', true);
+          save().then(function () {
+            fetch('/api/test_model', { method: 'POST' })
+              .then(function (r) { return r.json(); })
+              .then(function (d) {
+                if (d.ok) msg('Model replied: "' + d.reply + '"', true);
+                else msg('FAILED: ' + d.error, false);
+              });
+          });
+        };
+      });
   }
 
   function nodeRow(cls, mk, title, sub, st) {
@@ -491,6 +617,8 @@
               if (currentView === 'memory') renderMemory(d);
             })
             .catch(function () {});
+        } else if (v === 'settings') {
+          renderSettings();
         } else if (lastState) renderPage(lastState);
       }
     }
@@ -535,7 +663,7 @@
       'overview': 'dashboard', 'plans & tasks': 'plans',
       'memory': 'memory', 'verification': 'verification',
       'economy': 'economy', 'security': 'security',
-      'sessions': 'sessions'
+      'sessions': 'sessions', 'settings': 'settings'
     };
     document.querySelectorAll('.navbtn').forEach(function (b) {
       var name = b.textContent.trim().toLowerCase();
