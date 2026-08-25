@@ -71,6 +71,19 @@ class Agent:
                                  'content': json.dumps({'ok': True})})
                     continue
 
+                if fn == 'complete_step':
+                    try:
+                        idx = int(json.loads(
+                            tc['function'].get('arguments') or '{}'
+                        ).get('index', -1))
+                    except (ValueError, TypeError):
+                        idx = -1
+                    self.log('PLAN_STEP', detail={'index': idx})
+                    msgs.append({'role': 'tool',
+                                 'tool_call_id': tc.get('id'),
+                                 'content': json.dumps({'ok': True})})
+                    continue
+
                 scope = None
                 if fn in ('write_file', 'run_tests'):
                     scope = ('fs:write ' +

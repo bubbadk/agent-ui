@@ -53,17 +53,25 @@ class MockProvider:
                        {'id': 'call_wx', 'type': 'function', 'function': {
                            'name': 'web_fetch',
                            'arguments': json.dumps({'url': url})}}]}
+        elif n == 1:
+            msg = {'role': 'assistant',
+                   'content': 'Weather fetched; marking the step done.',
+                   'tool_calls': [{'id': 'call_done', 'type': 'function',
+                                   'function': {'name': 'complete_step',
+                                                'arguments': json.dumps(
+                                                    {'index': 0})}}]}
         else:
-            obs = ''
+            body = ''
             for x in messages:
                 if x.get('role') == 'tool':
-                    obs = x.get('content', '')
-            try:
-                body = json.loads(obs).get('body', '')
-            except ValueError:
-                body = ''
-            text = ('Current weather — %s' % body.strip()) if body else                 ('I could not retrieve the weather right now. Raw: %s'
-                 % obs[:200])
+                    try:
+                        d = json.loads(x.get('content', ''))
+                    except ValueError:
+                        continue
+                    if isinstance(d, dict) and 'body' in d:
+                        body = d.get('body', '')
+            text = ('Current weather — %s' % body.strip()) if body else \
+                ('I could not retrieve the weather right now.')
             msg = {'role': 'assistant', 'content': text}
         return {'message': msg,
                 'usage': {'prompt_tokens': 70 + 40 * n,
@@ -86,11 +94,14 @@ class MockProvider:
                                           '    print(greet())\n'})}}]}
         elif n == 1:
             msg = {'role': 'assistant',
-                   'content': 'Now verifying the module compiles.',
-                   'tool_calls': [{'id': 'call_2', 'type': 'function',
-                                   'function': {'name': 'run_tests',
-                                                'arguments': json.dumps(
-                                                    {'target': 'hello.py'})}}]}
+                   'content': 'Step 1 done. Now verifying the module compiles.',
+                   'tool_calls': [
+                       {'id': 'call_s1', 'type': 'function', 'function': {
+                           'name': 'complete_step',
+                           'arguments': json.dumps({'index': 0})}},
+                       {'id': 'call_2', 'type': 'function', 'function': {
+                           'name': 'run_tests',
+                           'arguments': json.dumps({'target': 'hello.py'})}}]}
         else:
             msg = {'role': 'assistant',
                    'content': 'Done: hello.py written and verified. '

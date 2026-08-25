@@ -46,7 +46,13 @@ def _refresh_state():
             elif k == 'PLAN_SET':
                 steps = e['detail'].get('steps') or []
                 if steps:
-                    STATE['plan'] = steps
+                    STATE['plan'] = [{'t': str(s)[:80], 'done': False}
+                                     for s in steps]
+            elif k == 'PLAN_STEP':
+                idx = e['detail'].get('index', -1)
+                plan = STATE.get('plan')
+                if plan and 0 <= idx < len(plan):
+                    plan[idx]['done'] = True
             elif k == 'COMMITTED':
                 STATE['phase'] = 'committed'
             elif k == 'TASK_COMPLETED':
@@ -76,15 +82,19 @@ def _tree():
         return [{'d': 0, 't': STATE['goal'][:60] or '(goal)', 's': s0},
                 {'d': 1, 't': 'verify gates & commit', 's': s1}]
 
-    def status(i):
+    def status(i, item):
         if ph in ('committed', 'done'):
             return 'done'
         if ph == 'blocked':
             return 'blocked'
-        return 'running' if i == 0 else 'pending'
+        if item.get('done'):
+            return 'done'
+        first_open = next((j for j, p in enumerate(plan)
+                           if not p.get('done')), None)
+        return 'running' if i == first_open else 'pending'
 
-    return [{'d': i, 't': str(step)[:60], 's': status(i)}
-            for i, step in enumerate(plan)]
+    return [{'d': i, 't': str(p['t'])[:60], 's': status(i, p)}
+            for i, p in enumerate(plan)]
 
 
 def _start_task(goal):

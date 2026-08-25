@@ -31,6 +31,13 @@ SCHEMAS = [
         'parameters': {'type': 'object',
                        'properties': {'target': {'type': 'string'}}}}},
     {'type': 'function', 'function': {
+        'name': 'complete_step',
+        'description': 'Mark a plan step (0-based index, as given to set_plan) '
+                       'as completed.',
+        'parameters': {'type': 'object',
+                       'properties': {'index': {'type': 'integer'}},
+                       'required': ['index']}}},
+    {'type': 'function', 'function': {
         'name': 'run_command',
         'description': 'Run an allowlisted shell command inside the workspace '
                        '(ls, cat, echo, grep, python3, git, ...). No shell '

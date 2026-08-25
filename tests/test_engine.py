@@ -83,9 +83,18 @@ class EngineTest(unittest.TestCase):
                          {'ok': True, 'url': 'https://wttr.in/nyborg?format=3',
                           'body': 'Nyborg: ☀️ +21°C'})})
         r2 = prov.chat(msgs)
-        self.assertNotIn('tool_calls', r2['message'])
-        self.assertIn('+21°C', r2['message']['content'])
-        self.assertIn('Nyborg', r2['message']['content'])
+        calls2 = r2['message'].get('tool_calls') or []
+        self.assertEqual(len(calls2), 1)
+        self.assertEqual(calls2[0]['function']['name'], 'complete_step')
+        self.assertIn('"index": 0', calls2[0]['function']['arguments'])
+
+        msgs.append(r2['message'])
+        msgs.append({'role': 'tool', 'tool_call_id': 'call_done',
+                     'content': json.dumps({'ok': True})})
+        r3 = prov.chat(msgs)
+        self.assertNotIn('tool_calls', r3['message'])
+        self.assertIn('+21°C', r3['message']['content'])
+        self.assertIn('Nyborg', r3['message']['content'])
 
     def test_web_fetch_ssrf_guard(self):
         from tools import _url_allowed  # noqa: E402
@@ -119,6 +128,13 @@ class EngineTest(unittest.TestCase):
         self.assertGreaterEqual(len(plan['detail']['steps']), 2)
         first_tool = next(e for e in entries if e['kind'] == 'TOOL_CALL')
         self.assertLess(plan['id'], first_tool['id'])
+
+    def test_plan_progress_is_logged(self):
+        """The agent must mark plan steps done as it completes them."""
+        steps = [e['detail'] for e in self.ledger._entries()
+                 if e['kind'] == 'PLAN_STEP']
+        self.assertTrue(any(d.get('index') == 0 for d in steps),
+                        'step 0 should be marked complete during the run')
 
     def test_strict_gate_blocks_on_failure(self):
         ws = tempfile.mkdtemp(prefix='atlas_bad_')

@@ -14,6 +14,9 @@
   var MK = { done: '\u2713', running: '\u25c8', blocked: '\u25ae', pending: '\u00b7' };
   var seen = { consoleUpTo: 0, treeSig: '', tableSig: '', lastReply: 0 };
   var replyCard = null;
+  var lastState = null;
+  var currentView = 'dashboard';
+  var pageEl = null;
 
   function el(id) { return document.getElementById(id); }
   function esc(x) {
@@ -122,6 +125,7 @@
   }
 
   function render(s) {
+    lastState = s;
     renderConsole(s.ledger);
     renderTree(s.tree || []);
     renderTable(s.ledger);
@@ -133,6 +137,104 @@
       '$' + s.budget.spent.toFixed(2) + '/$' + s.budget.limit.toFixed(0);
     el('budBar').style.width =
       Math.min(100, s.budget.spent / s.budget.limit * 100) + '%';
+    if (currentView !== 'dashboard') renderPage(s);
+  }
+
+  function renderEconomy(s) {
+    var rows = s.ledger.filter(function (e) { return e.cost != null; });
+    var byModel = {};
+    rows.forEach(function (e) {
+      byModel[e.model] = (byModel[e.model] || 0) + e.cost;
+    });
+    var chips = Object.keys(byModel).map(function (m) {
+      return '<span>' + esc(m) + ' <b style="color:var(--acc)">$' +
+        byModel[m].toFixed(4) + '</b></span>';
+    }).join('');
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">ECONOMY \u00b7 FULL LEDGER</h3>' +
+      '<div style="display:flex;gap:20px;flex-wrap:wrap;font-family:var(--mono);' +
+      'font-size:12px;color:var(--mut);margin-bottom:14px">' +
+      '<span>TOTAL <b style="color:var(--acc)">$' + s.budget.spent.toFixed(4) +
+      '</b> / $' + s.budget.limit.toFixed(0) + '</span>' + chips + '</div>' +
+      '<table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11.5px">' +
+      '<thead><tr>' +
+      ['Time', 'Event', 'Model', 'Tok', 'Cost'].map(function (h, i) {
+        return '<th style="text-align:' + (i >= 3 ? 'right' : 'left') +
+          ';padding:5px 8px;color:var(--mut);font-weight:400;border-bottom:1px solid var(--ink)">' +
+          h.toUpperCase() + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      rows.map(function (e) {
+        return '<tr>' +
+          '<td style="padding:6px 8px;color:var(--mut)">' + e.t + '</td>' +
+          '<td style="padding:6px 8px">' + esc(e.kind.toLowerCase()) + '</td>' +
+          '<td style="padding:6px 8px">' + esc(e.model || '') + '</td>' +
+          '<td style="padding:6px 8px;text-align:right">' +
+          ((e.tokens && (e.tokens['in'] + e.tokens.out)) || '-') + '</td>' +
+          '<td style="padding:6px 8px;text-align:right">$' +
+          (e.cost.toFixed ? e.cost.toFixed(4) : e.cost) + '</td></tr>';
+      }).join('') +
+      '</tbody></table>' +
+      '<p style="font-style:italic;color:var(--mut);font-size:12.5px;margin-top:10px">' +
+      'Showing the recent ledger window (' + rows.length +
+      ' priced events). Older entries live in data/ledger.jsonl.</p></div>';
+  }
+
+  function renderSessions(s) {
+    var tasks = [];
+    var cur = null;
+    s.ledger.forEach(function (e) {
+      if (e.kind === 'TASK_STARTED') {
+        cur = { goal: e.detail.goal || '(no goal)', cost: 0,
+                status: 'running', summary: '' };
+        tasks.push(cur);
+      } else if (cur) {
+        if (e.cost) cur.cost += e.cost;
+        if (e.kind === 'TASK_COMPLETED') {
+          cur.status = 'completed';
+          cur.summary = e.detail.summary || '';
+        } else if (e.kind === 'TASK_BLOCKED') {
+          cur.status = 'blocked';
+          cur.summary = e.detail.reason || 'gates failed';
+        }
+      }
+    });
+    var MK2 = { done: '\u2713', running: '\u25c8', blocked: '\u25ae' };
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">SESSIONS \u00b7 TASK HISTORY</h3>' +
+      (tasks.length ? tasks.map(function (t) {
+        var cls = t.status === 'completed' ? 'done' : t.status;
+        return '<div class="node ' + cls + '">' +
+          '<span class="mk">' + MK2[cls] + '</span>' +
+          '<span class="ti">' + esc(t.goal) +
+          (t.summary ? '<br><small style="color:var(--mut)">' +
+           esc(t.summary.slice(0, 140)) + '</small>' : '') +
+          '</span><span class="st">' + t.status + ' \u00b7 $' +
+          t.cost.toFixed(4) + '</span></div>';
+      }).join('')
+        : '<p style="font-style:italic;color:var(--mut)">No tasks in the recent ledger window.</p>') +
+      '</div>';
+  }
+
+  function renderPage(s) {
+    if (!pageEl) return;
+    if (currentView === 'economy') renderEconomy(s);
+    else if (currentView === 'sessions') renderSessions(s);
+  }
+
+  function showView(v) {
+    currentView = v;
+    var dash = document.querySelector('.main3');
+    var stats = document.querySelector('.stats');
+    if (v === 'dashboard') {
+      dash.style.display = ''; stats.style.display = '';
+      if (pageEl) pageEl.style.display = 'none';
+    } else {
+      dash.style.display = 'none'; stats.style.display = 'none';
+      if (pageEl) {
+        pageEl.style.display = '';
+        if (lastState) renderPage(lastState);
+      }
+    }
   }
 
   async function init() {
@@ -158,6 +260,28 @@
     replyCard.innerHTML = '<h3 class="ct">AGENT REPLY</h3>' +
       '<div id="replyBody" style="font-style:italic;line-height:1.65"></div>';
     form.insertAdjacentElement('afterend', replyCard);
+
+    pageEl = document.createElement('div');
+    pageEl.id = 'pageView';
+    pageEl.style.display = 'none';
+    document.querySelector('.main3').insertAdjacentElement('afterend', pageEl);
+
+    function setNav(btn) {
+      document.querySelectorAll('.navbtn').forEach(function (x) {
+        x.classList.remove('on');
+      });
+      btn.classList.add('on');
+    }
+    document.querySelectorAll('.navbtn').forEach(function (b) {
+      var name = b.textContent.trim().toLowerCase();
+      var handler = b.onclick;               // keep the demo stub toast
+      b.onclick = function () {
+        if (name === 'overview') { setNav(b); showView('dashboard'); }
+        else if (name === 'economy') { setNav(b); showView('economy'); }
+        else if (name === 'sessions') { setNav(b); showView('sessions'); }
+        else if (handler) { handler.call(b); }   // stub sections keep toast
+      };
+    });
 
     form.onsubmit = async function (ev) {
       ev.preventDefault();
