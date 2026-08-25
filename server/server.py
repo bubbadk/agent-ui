@@ -8,6 +8,7 @@ Routes:
   GET  /live.js              UI wiring for live engine mode
   GET  /api/health           {"ok":true,"provider":...}
   GET  /api/state            ledger tail, plan tree, grants, budget
+  GET  /api/memory           episodic memory entries
   POST /api/task             {"goal": "..."} — starts the agent in a thread
 """
 import json
@@ -130,6 +131,12 @@ class Handler(BaseHTTPRequestHandler):
             key_ok = bool(api_key(CFG)) or prov == 'mock'
             return self._send(200, json.dumps(
                 {'ok': bool(key_ok), 'provider': prov}))
+        if self.path == '/api/memory':
+            return self._send(200, json.dumps({
+                'ok': True,
+                'count': len(MEMORY.episodes),
+                'episodes': list(reversed(MEMORY.episodes[-50:])),
+            }))
         if self.path == '/api/state':
             st = dict(_refresh_state())
             now = time.time()

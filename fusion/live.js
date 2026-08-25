@@ -219,6 +219,118 @@
     if (!pageEl) return;
     if (currentView === 'economy') renderEconomy(s);
     else if (currentView === 'sessions') renderSessions(s);
+    else if (currentView === 'plans') renderPlans(s);
+    else if (currentView === 'verification') renderVerification(s);
+    else if (currentView === 'security') renderSecurity(s);
+  }
+
+  function nodeRow(cls, mk, title, sub, st) {
+    return '<div class="node ' + cls + '"><span class="mk">' + mk + '</span>' +
+      '<span class="ti">' + esc(title) +
+      (sub ? '<br><small style="color:var(--mut)">' + esc(sub) + '</small>' : '') +
+      '</span><span class="st">' + st + '</span></div>';
+  }
+
+  function renderPlans(s) {
+    var MKP = { done: '\u2713', running: '\u25c8',
+                blocked: '\u25ae', pending: '\u00b7' };
+    var vr = null;
+    s.ledger.forEach(function (e) { if (e.kind === 'VERIFY_RUN') vr = e; });
+    var critHtml;
+    if (vr && vr.detail && vr.detail.criteria) {
+      critHtml = vr.detail.criteria.map(function (c) {
+        return '<div class="node ' + (c.pass ? 'done' : 'blocked') + '">' +
+          '<span class="mk">' + (c.pass ? '\u2713' : '\u2717') + '</span>' +
+          '<span class="ti">' + esc(c.check) + '</span>' +
+          '<span class="st">' + (c.pass ? 'pass' : 'fail') + '</span></div>';
+      }).join('');
+    } else {
+      critHtml = '<p style="font-style:italic;color:var(--mut)">No gate run yet.</p>';
+    }
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">PLANS &amp; TASKS \u00b7 CURRENT PLAN</h3>' +
+      (s.tree.length ? s.tree.map(function (n) {
+        return nodeRow(n.s, MKP[n.s] || '\u00b7', n.t, '', n.s);
+      }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">No active task. Give the agent a goal on the dashboard.</p>') +
+      '</div>' +
+      '<div class="glass card" style="margin-top:16px">' +
+      '<h3 class="ct">ACCEPTANCE CRITERIA \u00b7 LATEST GATE RUN</h3>' +
+      critHtml + '</div>';
+  }
+
+  function renderMemory(d) {
+    var eps = d.episodes || [];
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">MEMORY \u00b7 EPISODIC STORE (' + d.count + ' entries)</h3>' +
+      (eps.length ? eps.map(function (ep) {
+        return nodeRow('', '\u25c6', ep.goal,
+          ep.t + ' \u00b7 ' + ep.outcome, 'memory');
+      }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">No episodes yet \u2014 completed tasks are remembered here.</p>') +
+      '</div>';
+  }
+
+  function renderVerification(s) {
+    var runs = s.ledger.filter(function (e) {
+      return e.kind === 'VERIFY_RUN';
+    });
+    var passed = runs.filter(function (e) {
+      return e.detail && e.detail.passed;
+    }).length;
+    var list = runs.slice(-8).reverse().map(function (e) {
+      var cs = (e.detail.criteria || []).map(function (c) {
+        return '<div style="font-family:var(--mono);font-size:11px;color:var(--mut);padding:2px 0">' +
+          (c.pass ? '\u2713' : '\u2717') + ' ' + esc(c.check) + '</div>';
+      }).join('');
+      return '<div style="border-bottom:1px dotted var(--rule);padding:10px 0">' +
+        '<div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px">' +
+        '<span>' + e.t + '</span><span style="color:' +
+        (e.detail.passed ? 'var(--good)' : 'var(--bad)') + '">' +
+        (e.detail.passed ? 'PASS' : 'FAIL') + '</span></div>' + cs + '</div>';
+    }).join('');
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">VERIFICATION \u00b7 GATE MODE</h3>' +
+      '<div style="font-family:var(--mono);font-size:12px;margin-bottom:14px">' +
+      'MODE: <b style="color:var(--acc)">' + esc(s.gates.toUpperCase()) +
+      '</b> \u00b7 RUNS: ' + runs.length +
+      ' \u00b7 PASSED: <b style="color:var(--good)">' + passed + '</b></div>' +
+      (list || '<p style="font-style:italic;color:var(--mut)">No gate runs yet.</p>') +
+      '</div>';
+  }
+
+  function renderSecurity(s) {
+    var granted = {};
+    s.ledger.forEach(function (e) {
+      if (e.kind === 'CAPABILITY_GRANTED' && e.detail.scope)
+        granted[e.detail.scope] = e.t;
+    });
+    var denials = s.ledger.filter(function (e) {
+      return e.kind === 'TOOL_RESULT' && e.detail && e.detail.ok === false;
+    });
+    pageEl.innerHTML = '<div class="glass card">' +
+      '<h3 class="ct">SECURITY \u00b7 ACTIVE CAPABILITY GRANTS</h3>' +
+      (s.caps.length ? s.caps.map(function (c) {
+        return nodeRow('', '\u25c6', c.scope, 'auto-expiring',
+          'live \u00b7 ' + c.left);
+      }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">No active grants.</p>') +
+      '</div><div class="glass card" style="margin-top:16px">' +
+      '<h3 class="ct">GRANT HISTORY</h3>' +
+      (Object.keys(granted).length ?
+        Object.keys(granted).map(function (scope) {
+          return nodeRow('', '\u25c6', scope,
+            'granted at ' + granted[scope], 'logged');
+        }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">None yet.</p>') +
+      '</div><div class="glass card" style="margin-top:16px">' +
+      '<h3 class="ct">TOOL ERRORS &amp; DENIALS</h3>' +
+      (denials.length ? denials.map(function (e) {
+        return nodeRow('blocked', '\u2717', 'tool result: error',
+          'at ' + e.t, 'check');
+      }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">None in the recent window. Default-deny holds.</p>') +
+      '</div>';
   }
 
   function showView(v) {
@@ -232,7 +344,15 @@
       dash.style.display = 'none'; stats.style.display = 'none';
       if (pageEl) {
         pageEl.style.display = '';
-        if (lastState) renderPage(lastState);
+        if (v === 'memory') {
+          pageEl.innerHTML = '<div class="glass card"><h3 class="ct">MEMORY \u00b7 LOADING\u2026</h3></div>';
+          fetch('/api/memory', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (currentView === 'memory') renderMemory(d);
+            })
+            .catch(function () {});
+        } else if (lastState) renderPage(lastState);
       }
     }
   }
@@ -272,14 +392,19 @@
       });
       btn.classList.add('on');
     }
+    var VIEWS = {
+      'overview': 'dashboard', 'plans & tasks': 'plans',
+      'memory': 'memory', 'verification': 'verification',
+      'economy': 'economy', 'security': 'security',
+      'sessions': 'sessions'
+    };
     document.querySelectorAll('.navbtn').forEach(function (b) {
       var name = b.textContent.trim().toLowerCase();
-      var handler = b.onclick;               // keep the demo stub toast
       b.onclick = function () {
-        if (name === 'overview') { setNav(b); showView('dashboard'); }
-        else if (name === 'economy') { setNav(b); showView('economy'); }
-        else if (name === 'sessions') { setNav(b); showView('sessions'); }
-        else if (handler) { handler.call(b); }   // stub sections keep toast
+        var v = VIEWS[name];
+        if (!v) { toast(name + ' — unknown section'); return; }
+        setNav(b);
+        showView(v);
       };
     });
 
