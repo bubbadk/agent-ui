@@ -18,11 +18,12 @@ DEFAULTS = {
     'providers': {},                         # per-vendor: base_url/model/api_key
     'agents': {},                            # named agents (Bot Mode)
     'active_agent': '',
+    'schedules': [],                         # recurring standing orders
 }
 
 PERSIST_KEYS = ('provider', 'base_url', 'model', 'api_key_env', 'api_key',
                 'gates', 'daily_budget', 'sub_budget', 'provider_key',
-                'providers', 'agents', 'active_agent')
+                'providers', 'agents', 'active_agent', 'schedules')
 
 ALL_SKILLS = ['files', 'code', 'shell', 'web', 'subagents']
 

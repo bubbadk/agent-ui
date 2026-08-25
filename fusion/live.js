@@ -322,6 +322,12 @@
             return '<button class="tbtn' + (c.gates === g ? ' on' : '') +
               '" data-v="' + g + '">' + g.toUpperCase() + '</button>';
           }).join('') + '</div></div>' +
+          '<div class="crow"><div class="clab">Standing orders<small>' +
+          'JSON: id, goal, interval_seconds, enabled</small></div>' +
+          '<textarea id="cfgSchedules" rows="5" style="width:100%;background:none;' +
+          'border:1px solid var(--gborder);color:inherit;font-family:var(--mono);' +
+          'font-size:11px;padding:8px;border-radius:8px">' +
+          esc(JSON.stringify(c.schedules || [], null, 2)) + '</textarea></div>' +
           '<div style="display:flex;gap:10px;margin-top:18px">' +
           '<button class="tbtn" id="cfgTest" style="border-color:var(--acc);' +
           'color:var(--acc)">TEST CONNECTION</button>' +
@@ -387,6 +393,15 @@
             body: JSON.stringify(payload)
           }).then(function (r) { return r.json(); });
         }
+        function saveSchedules() {
+          var schedules;
+          try { schedules = JSON.parse(el('cfgSchedules').value || '[]'); }
+          catch (e) { return Promise.resolve({ ok: false, error: 'invalid schedule JSON' }); }
+          return fetch('/api/schedules', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ schedules: schedules })
+          }).then(function (r) { return r.json(); });
+        }
         function msg(text, good) {
           el('cfgMsg').textContent = text;
           el('cfgMsg').style.color = good ? 'var(--good)' : 'var(--bad)';
@@ -412,7 +427,10 @@
         el('cfgSave').onclick = function () {
           save().then(function (d) {
             if (d.ok) {
-              msg('Saved \u2713 \u2014 new tasks use these settings.', true);
+              saveSchedules().then(function (sd) {
+                if (!sd.ok) { msg('Schedule error: ' + sd.error, false); return; }
+                msg('Saved \u2713 \u2014 settings and standing orders updated.', true);
+              });
               health().then(function (h) {
                 if (h) document.querySelector('.edition').textContent =
                   'FUSION \u00b7 LIVE ENGINE (' + h.provider + ')';

@@ -38,6 +38,66 @@ MEMORY = Memory(os.path.join(ROOT, 'data', 'memory.json'))
 STATE = {'phase': 'idle', 'goal': '', 'last_seen': 0, 'grants': [],
          'plan': None}
 STATE_LOCK = threading.Lock()
+SCHEDULE_LOCK = threading.Lock()
+
+
+def _normalise_schedules(items):
+    """Return key-safe, bounded recurring schedule definitions."""
+    out = []
+    for raw in items if isinstance(items, list) else []:
+        if not isinstance(raw, dict):
+            continue
+        sid = str(raw.get('id', '')).strip().lower()
+        goal = str(raw.get('goal', '')).strip()[:2000]
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,31}', sid) or not goal:
+            continue
+        try:
+            interval = max(1, int(raw.get('interval_seconds', 3600)))
+        except (TypeError, ValueError):
+            interval = 3600
+        try:
+            next_run = float(raw.get('next_run', 0) or 0)
+        except (TypeError, ValueError):
+            next_run = 0
+        out.append({'id': sid, 'goal': goal, 'interval_seconds': interval,
+                    'enabled': bool(raw.get('enabled', True)),
+                    'next_run': next_run})
+    return out
+
+
+CFG['schedules'] = _normalise_schedules(CFG.get('schedules', []))
+
+
+def _run_scheduled(schedule):
+    """Log and execute one standing order without exposing credentials."""
+    result = _start_task(schedule['goal'])
+    if result.get('started'):
+        LEDGER.append('SCHEDULED_RUN', detail={
+            'schedule_id': schedule['id'], 'goal': schedule['goal']})
+
+
+def _scheduler_loop():
+    while True:
+        time.sleep(1)
+        _refresh_state()
+        now = time.time()
+        with SCHEDULE_LOCK:
+            schedules = CFG.get('schedules') or []
+            for schedule in schedules:
+                if not schedule.get('enabled'):
+                    continue
+                due = float(schedule.get('next_run') or 0)
+                if due > now:
+                    continue
+                with STATE_LOCK:
+                    available = STATE['phase'] not in ('starting', 'running')
+                if not available:
+                    schedule['next_run'] = now + 5
+                    continue
+                schedule['next_run'] = now + schedule['interval_seconds']
+                threading.Thread(target=_run_scheduled, args=(dict(schedule),),
+                                 daemon=True).start()
+                break
 
 
 def _refresh_state():
@@ -105,7 +165,7 @@ def _tree():
 
 def _start_task(goal):
     with STATE_LOCK:
-        if STATE['phase'] == 'running':
+        if STATE['phase'] in ('starting', 'running'):
             return {'error': 'a task is already running'}
         STATE['phase'] = 'starting'
 
@@ -131,7 +191,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         # NB: self.path includes the query string — match on the path part
-        if urlparse(self.path).path == '/api/models':
+        path = urlparse(self.path).path
+        if path == '/api/models':
             from urllib.parse import parse_qs
             pk = parse_qs(urlparse(self.path).query).get(
                 'provider_key', [CFG.get('provider_key', '')])[0]
@@ -154,7 +215,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:              # noqa: BLE001
                 return self._send(200, json.dumps(
                     {'ok': False, 'error': str(exc)[:300]}))
-        if self.path == '/api/agents':
+        if path == '/api/agents':
             return self._send(200, json.dumps({
                 'ok': True,
                 'agents': CFG.get('agents', {}),
@@ -162,7 +223,7 @@ class Handler(BaseHTTPRequestHandler):
                 'provider_keys': ['mock'] +
                     sorted((CFG.get('providers') or {}).keys()),
             }))
-        if self.path == '/api/config':
+        if path == '/api/config':
             return self._send(200, json.dumps({'ok': True, 'config': {
                 'provider': CFG['provider'],
                 'model': CFG['model'],
@@ -173,19 +234,23 @@ class Handler(BaseHTTPRequestHandler):
                 'daily_budget': float(CFG['daily_budget']),
                 'sub_budget': float(CFG.get('sub_budget', 0.5)),
                 'gates': CFG['gates'],
+                'schedules': CFG.get('schedules', []),
             }}))
-        if self.path == '/api/health':
+        if path == '/api/schedules':
+            return self._send(200, json.dumps({
+                'ok': True, 'schedules': CFG.get('schedules', [])}))
+        if path == '/api/health':
             prov = CFG['provider']
             key_ok = bool(api_key(CFG)) or prov == 'mock'
             return self._send(200, json.dumps(
                 {'ok': bool(key_ok), 'provider': prov}))
-        if self.path == '/api/memory':
+        if path == '/api/memory' and not urlparse(self.path).query:
             return self._send(200, json.dumps({
                 'ok': True,
                 'count': len(MEMORY.episodes),
                 'episodes': list(reversed(MEMORY.episodes[-50:])),
             }))
-        if self.path.startswith('/api/memory'):
+        if path == '/api/memory':
             from urllib.parse import parse_qs
             q = parse_qs(urlparse(self.path).query).get('q', [''])[0]
             if q:
@@ -198,7 +263,7 @@ class Handler(BaseHTTPRequestHandler):
                 'count': len(MEMORY.episodes),
                 'episodes': list(reversed(MEMORY.episodes[-50:])),
             }))
-        if self.path.startswith('/api/task_events'):
+        if path == '/api/task_events':
             from urllib.parse import parse_qs
             start = int(parse_qs(urlparse(self.path).query)
                         .get('start', ['0'])[0])
@@ -212,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
                 if started:
                     events.append(e)
             return self._send(200, json.dumps({'ok': True, 'events': events}))
-        if self.path == '/api/state':
+        if path == '/api/state':
             st = dict(_refresh_state())
             now = time.time()
             grants = []
@@ -248,7 +313,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read(), ctype)
 
     def do_POST(self):
-        if self.path == '/api/agents':
+        path = urlparse(self.path).path
+        if path == '/api/agents':
             try:
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
@@ -279,7 +345,7 @@ class Handler(BaseHTTPRequestHandler):
                 'ok': True, 'name': name,
                 'active': CFG['active_agent'],
                 'agents': CFG['agents']}))
-        if self.path == '/api/agents/activate':
+        if path == '/api/agents/activate':
             try:
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
@@ -291,7 +357,7 @@ class Handler(BaseHTTPRequestHandler):
             CFG['active_agent'] = name
             config_mod.save(CFG)
             return self._send(200, json.dumps({'ok': True, 'active': name}))
-        if self.path == '/api/agents/delete':
+        if path == '/api/agents/delete':
             try:
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
@@ -310,7 +376,7 @@ class Handler(BaseHTTPRequestHandler):
             config_mod.save(CFG)
             return self._send(200, json.dumps(
                 {'ok': True, 'active': CFG['active_agent']}))
-        if self.path == '/api/config':
+        if path == '/api/config':
             try:
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
@@ -344,7 +410,23 @@ class Handler(BaseHTTPRequestHandler):
                 'ok': True, 'provider': CFG['provider'],
                 'model': CFG['model'], 'gates': CFG['gates'],
                 'api_key_set': bool(api_key(CFG))}))
-        if self.path == '/api/test_model':
+        if path == '/api/schedules':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            schedules = _normalise_schedules(body.get('schedules', []))
+            now = time.time()
+            for schedule in schedules:
+                if not schedule['next_run'] or schedule['next_run'] < now:
+                    schedule['next_run'] = now + schedule['interval_seconds']
+            with SCHEDULE_LOCK:
+                CFG['schedules'] = schedules
+                config_mod.save(CFG)
+            return self._send(200, json.dumps({'ok': True,
+                                               'schedules': schedules}))
+        if path == '/api/test_model':
             cfg = dict(CFG)
             cfg['_api_key'] = api_key(CFG)
             try:
@@ -357,7 +439,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:                  # noqa: BLE001
                 return self._send(200, json.dumps(
                     {'ok': False, 'error': str(exc)[:300]}))
-        if self.path == '/api/gates':
+        if path == '/api/gates':
             try:
                 n = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(n) or b'{}')
@@ -368,7 +450,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, '{"error":"invalid gates"}')
             CFG['gates'] = g
             return self._send(200, json.dumps({'ok': True, 'gates': g}))
-        if self.path != '/api/task':
+        if path != '/api/task':
             return self._send(404, '{"error":"not found"}')
         try:
             n = int(self.headers.get('Content-Length', 0))
@@ -387,4 +469,5 @@ if __name__ == '__main__':
     print('UI:      http://localhost:%d/' % port)
     print('Provider: %s (set ~/.agentui/config.json + %s for a real model)'
           % (CFG['provider'], CFG['api_key_env']))
+    threading.Thread(target=_scheduler_loop, daemon=True).start()
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()
