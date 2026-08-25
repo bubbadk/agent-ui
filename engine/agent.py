@@ -6,9 +6,10 @@ import tools as T
 from providers import make_provider
 
 SYSTEM_PROMPT = (
-    'You are Atlas, a careful autonomous agent. Work step by step using the '
-    'provided tools. Keep everything inside the workspace. When you believe '
-    'the goal is met, stop calling tools and give a one-paragraph summary.'
+    'You are Atlas, a careful autonomous agent. Always call set_plan first '
+    'with 2-4 short steps, then work step by step using the provided tools. '
+    'Keep everything inside the workspace. When you believe the goal is met, '
+    'stop calling tools and give a one-paragraph summary.'
 )
 
 
@@ -55,12 +56,29 @@ class Agent:
 
             for tc in calls:
                 fn = tc['function']['name']
+
+                if fn == 'set_plan':
+                    try:
+                        steps = json.loads(
+                            tc['function'].get('arguments') or '{}'
+                        ).get('steps', [])
+                    except ValueError:
+                        steps = []
+                    self.log('PLAN_SET', detail={
+                        'steps': [str(s)[:80] for s in steps]})
+                    msgs.append({'role': 'tool',
+                                 'tool_call_id': tc.get('id'),
+                                 'content': json.dumps({'ok': True})})
+                    continue
+
                 scope = None
                 if fn in ('write_file', 'run_tests'):
                     scope = ('fs:write ' +
                              os.path.basename(self.cfg['workspace']) + '/')
                 elif fn == 'web_fetch':
                     scope = 'net:get'
+                elif fn == 'run_command':
+                    scope = 'shell:sandbox'
                 if scope and scope not in granted:
                     granted.add(scope)
                     self.log('CAPABILITY_GRANTED', detail={

@@ -31,6 +31,22 @@ SCHEMAS = [
         'parameters': {'type': 'object',
                        'properties': {'target': {'type': 'string'}}}}},
     {'type': 'function', 'function': {
+        'name': 'run_command',
+        'description': 'Run an allowlisted shell command inside the workspace '
+                       '(ls, cat, echo, grep, python3, git, ...). No shell '
+                       'operators; 30s timeout.',
+        'parameters': {'type': 'object',
+                       'properties': {'command': {'type': 'string'}},
+                       'required': ['command']}}},
+    {'type': 'function', 'function': {
+        'name': 'set_plan',
+        'description': 'Publish the plan for this task: 2-4 short steps. '
+                       'Call this first, before any other tool.',
+        'parameters': {'type': 'object',
+                       'properties': {'steps': {'type': 'array',
+                                                'items': {'type': 'string'}}},
+                       'required': ['steps']}}},
+    {'type': 'function', 'function': {
         'name': 'web_fetch',
         'description': 'Fetch an http(s) URL and return the response body as '
                        'text (first 4000 chars). Example: '
@@ -85,6 +101,28 @@ class ToolContext:
         return rp
 
 
+SHELL_ALLOW = {'ls', 'cat', 'echo', 'pwd', 'date', 'whoami', 'grep', 'wc',
+               'head', 'tail', 'python3', 'pip', 'git', 'find', 'sort',
+               'uniq', 'diff'}
+SHELL_OPS = {';', '&&', '||', '|', '&', '`', '>', '<', '$(', '>'}
+
+
+def _run_command(cmd, ctx):
+    import shlex
+    parts = shlex.split(cmd)
+    if not parts:
+        raise ValueError('empty command')
+    for tok in parts:
+        if tok in SHELL_OPS or any(ch in tok for ch in ';&|`<>$'):
+            raise PermissionError('shell operators not allowed: %s' % tok)
+    if parts[0] not in SHELL_ALLOW:
+        raise PermissionError('binary not allowlisted: %s' % parts[0])
+    r = subprocess.run(parts, cwd=ctx.ws, capture_output=True,
+                       text=True, timeout=30)
+    return {'ok': r.returncode == 0, 'exit': r.returncode,
+            'output': (r.stdout + r.stderr)[-4000:]}
+
+
 def _compile_check(path):
     r = subprocess.run([sys.executable, '-m', 'py_compile', path],
                        capture_output=True, text=True, timeout=60)
@@ -137,6 +175,12 @@ def _dispatch(name, args, ctx):
             results.append({'file': os.path.relpath(t, ctx.ws),
                             'pass': ok, 'output': out})
         return {'ok': all(r['pass'] for r in results), 'results': results}
+
+    if name == 'run_command':
+        return _run_command(args.get('command', ''), ctx)
+
+    if name == 'set_plan':
+        return {'ok': True}
 
     if name == 'web_fetch':
         body = _web_fetch(args['url'])

@@ -51,12 +51,21 @@ engine/  agent.py                plan -> act (tools) -> verify gate -> commit
 tests/   test_engine.py          end-to-end self tests
 ```
 
-### Security model (v0.1)
+### Security model (v0.2)
 
 * Tools can only touch paths inside `<repo>/workspace/`.
-* Writes/tests require an explicit `CAPABILITY_GRANTED` ledger entry.
+* `run_command` allowlists binaries (ls, cat, grep, python3, git, …), rejects
+  all shell operators (`; | & \`` etc.), runs with `shell=False`, 30s timeout.
+* Every capability is scoped and logged: `fs:write workspace/`,
+  `net:get`, `shell:sandbox` — shown live (with countdown) in the UI.
 * Strict gates: a task is only COMMITTED if every acceptance check passes,
   otherwise it is BLOCKED and recorded as such.
+
+### Tools (v0.2)
+
+`set_plan` (publishes the plan shown in the UI) · `write_file` · `read_file` ·
+`list_dir` · `run_tests` (py-compile acceptance check) · `run_command`
+(allowlisted, sandboxed) · `web_fetch` (SSRF-guarded)
 
 ## Tests
 

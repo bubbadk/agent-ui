@@ -69,8 +69,10 @@ class EngineTest(unittest.TestCase):
 
         r1 = prov.chat(msgs)
         calls = r1['message'].get('tool_calls') or []
-        self.assertEqual(len(calls), 1)
-        fn = calls[0]['function']
+        self.assertEqual(len(calls), 2)          # set_plan + web_fetch
+        self.assertEqual(calls[0]['function']['name'], 'set_plan')
+        self.assertIn('steps', calls[0]['function']['arguments'])
+        fn = calls[1]['function']
         self.assertEqual(fn['name'], 'web_fetch')
         self.assertIn('wttr.in', fn['arguments'])
         self.assertIn('nyborg', fn['arguments'])
@@ -95,6 +97,28 @@ class EngineTest(unittest.TestCase):
         self.assertFalse(ok)
         ok, why = _url_allowed('http://10.0.0.1/')
         self.assertFalse(ok)
+
+    def test_shell_tool_allowlist_and_injection_guard(self):
+        from tools import dispatch, ToolContext  # noqa: E402
+        ctx = ToolContext(self.ws, lambda *a: None)
+        r = dispatch('run_command', {'command': 'echo atlas'}, ctx)
+        self.assertTrue(r['ok'])
+        self.assertIn('atlas', r['output'])
+        r = dispatch('run_command', {'command': 'rm -rf /'}, ctx)
+        self.assertIn('error', r)
+        self.assertIn('allowlisted', r['error'])
+        r = dispatch('run_command', {'command': 'ls; echo pwned'}, ctx)
+        self.assertIn('error', r)
+        self.assertIn('operators', r['error'])
+
+    def test_plan_is_logged_before_tools(self):
+        k = self.kinds()
+        self.assertIn('PLAN_SET', k)
+        entries = self.ledger._entries()
+        plan = next(e for e in entries if e['kind'] == 'PLAN_SET')
+        self.assertGreaterEqual(len(plan['detail']['steps']), 2)
+        first_tool = next(e for e in entries if e['kind'] == 'TOOL_CALL')
+        self.assertLess(plan['id'], first_tool['id'])
 
     def test_strict_gate_blocks_on_failure(self):
         ws = tempfile.mkdtemp(prefix='atlas_bad_')

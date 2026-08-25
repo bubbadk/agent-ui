@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +29,8 @@ CFG = load()
 LEDGER = Ledger(os.path.join(ROOT, 'data', 'ledger.jsonl'))
 MEMORY = Memory(os.path.join(ROOT, 'data', 'memory.json'))
 
-STATE = {'phase': 'idle', 'goal': '', 'last_seen': 0, 'grants': []}
+STATE = {'phase': 'idle', 'goal': '', 'last_seen': 0, 'grants': [],
+         'plan': None}
 STATE_LOCK = threading.Lock()
 
 
@@ -40,6 +42,11 @@ def _refresh_state():
             if k == 'TASK_STARTED':
                 STATE['phase'] = 'running'
                 STATE['goal'] = e['detail'].get('goal', '')
+                STATE['plan'] = None
+            elif k == 'PLAN_SET':
+                steps = e['detail'].get('steps') or []
+                if steps:
+                    STATE['plan'] = steps
             elif k == 'COMMITTED':
                 STATE['phase'] = 'committed'
             elif k == 'TASK_COMPLETED':
@@ -47,9 +54,11 @@ def _refresh_state():
             elif k == 'TASK_BLOCKED':
                 STATE['phase'] = 'blocked'
             elif k == 'CAPABILITY_GRANTED':
+                scope = e['detail'].get('scope', 'cap')
+                STATE['grants'] = [g for g in STATE['grants']
+                                   if g['scope'] != scope]
                 STATE['grants'].append(
-                    {'scope': e['detail'].get('scope', 'cap'), 'left': 900})
-        STATE['grants'] = [g for g in STATE['grants'] if g['left'] > 0]
+                    {'scope': scope, 'exp': time.time() + 900})
     return STATE
 
 
@@ -57,12 +66,25 @@ def _tree():
     ph = STATE['phase']
     if ph == 'idle':
         return []
-    s0 = ('done' if ph in ('committed', 'done')
-          else 'blocked' if ph == 'blocked' else 'running')
-    s1 = {'running': 'pending', 'committed': 'running',
-          'done': 'done', 'blocked': 'blocked'}[ph]
-    return [{'d': 0, 't': STATE['goal'][:60] or '(goal)', 's': s0},
-            {'d': 1, 't': 'verify gates & commit', 's': s1}]
+    plan = STATE.get('plan')
+    if not plan:
+        # fallback before the model has published a plan
+        s0 = ('done' if ph in ('committed', 'done')
+              else 'blocked' if ph == 'blocked' else 'running')
+        s1 = {'running': 'pending', 'committed': 'running',
+              'done': 'done', 'blocked': 'blocked'}[ph]
+        return [{'d': 0, 't': STATE['goal'][:60] or '(goal)', 's': s0},
+                {'d': 1, 't': 'verify gates & commit', 's': s1}]
+
+    def status(i):
+        if ph in ('committed', 'done'):
+            return 'done'
+        if ph == 'blocked':
+            return 'blocked'
+        return 'running' if i == 0 else 'pending'
+
+    return [{'d': i, 't': str(step)[:60], 's': status(i)}
+            for i, step in enumerate(plan)]
 
 
 def _start_task(goal):
@@ -100,9 +122,14 @@ class Handler(BaseHTTPRequestHandler):
                 {'ok': bool(key_ok), 'provider': prov}))
         if self.path == '/api/state':
             st = dict(_refresh_state())
-            grants = [dict(g, left=max(1, g['left'])) for g in st['grants']]
-            for g in grants:
-                g['left'] = '%02d:%02d' % (g['left'] // 60, g['left'] % 60)
+            now = time.time()
+            grants = []
+            for g in st['grants']:
+                left = int(g['exp'] - now)
+                if left > 0:
+                    grants.append({'scope': g['scope'],
+                                   'left': '%02d:%02d' % (left // 60,
+                                                          left % 60)})
             return self._send(200, json.dumps({
                 'ok': True,
                 'provider': CFG['provider'],
