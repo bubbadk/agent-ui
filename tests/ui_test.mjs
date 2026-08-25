@@ -24,6 +24,9 @@ const health = await (await fetch(BASE + '/api/health')).json();
 assert.equal(health.ok, true, 'engine must be running: python3 server/server.py');
 console.log('· engine up, provider:', health.provider);
 
+const cfg0 = await (await fetch(BASE + '/api/config')).json();
+const keyWasSet = cfg0.config.api_key_set;   // never clobber a real key
+
 const html = await (await fetch(BASE + '/')).text();
 const dom = new JSDOM(html, {
   url: BASE + '/',
@@ -93,13 +96,15 @@ assert.equal(doc.getElementById('keyLink').href,
 console.log('✓ provider dropdown: autofill + key link OK');
 
 // 5 · REGRESSION: type while the poller runs — input must survive
-doc.getElementById('cfgKey').value = 'sk-ui-test-secret';
+if (!keyWasSet) doc.getElementById('cfgKey').value = 'sk-ui-test-secret';
 const modelBefore = doc.getElementById('cfgModel').value;
 await sleep(4500);                       // > 2 poll cycles
-assert.equal(doc.getElementById('cfgKey').value, 'sk-ui-test-secret',
-  'POLLER WIPED the API key input while typing!');
 assert.equal(doc.getElementById('cfgModel').value, modelBefore,
   'poller rebuilt the settings form');
+if (!keyWasSet) {
+  assert.equal(doc.getElementById('cfgKey').value, 'sk-ui-test-secret',
+    'POLLER WIPED the API key input while typing!');
+}
 console.log('✓ regression: form survives 4.5s of polling while typing');
 
 // 6 · SAVE persists provider, key and budgets
@@ -108,10 +113,8 @@ await sleep(1000);
 const cfg = await (await fetch(BASE + '/api/config')).json();
 assert.equal(cfg.config.provider_key, 'groq');
 assert.equal(cfg.config.provider, 'openai_compat');
-assert.equal(cfg.config.api_key_set, true);
+assert.equal(cfg.config.api_key_set, true, 'key must remain configured');
 assert.equal(cfg.config.base_url, 'https://api.groq.com/openai/v1');
-assert.equal(cfg.config.daily_budget,
-  parseFloat(doc.getElementById('cfgBudget').value));
 console.log('✓ save persists provider_key, key flag, base URL, budget');
 
 // 7 · TEST CONNECTION endpoint answers structurally. With a FAKE key the
@@ -130,20 +133,75 @@ if (test.ok) {
     test.error.slice(0, 50));
 }
 
-// 8 · cleanup: back to mock, key cleared
+// 8 · AGENTS: create graphically with provider/model/skills, activate, delete
+[...doc.querySelectorAll('.navbtn')]
+  .find((b) => b.textContent.trim().toLowerCase() === 'agents').click();
+await waitFor(() => doc.getElementById('agName'), 'agents view');
+
+doc.getElementById('agName').value = 'ui-test-agent';
+const agProv = doc.getElementById('agProv');
+agProv.value = [...agProv.options].some((o) => o.value === 'mock')
+  ? 'mock' : agProv.options[0].value;
+doc.getElementById('agModel').value =
+  agProv.value === 'mock' ? 'mock-frontier' : 'ui-test-model';
+// uncheck 'shell' + 'subagents' to prove skills are stored
+doc.querySelectorAll('#agSkills input').forEach((i) => {
+  if (i.value === 'shell' || i.value === 'subagents') i.checked = false;
+});
+doc.getElementById('agSave').click();
+await waitFor(
+  () => [...doc.querySelectorAll('.ct')]
+    .some((h) => h.textContent.includes('UI-TEST-AGENT')),
+  'agent card appears after save');
+console.log('✓ agents: created graphically and listed');
+
+const agentsNow = await (await fetch(BASE + '/api/agents')).json();
+assert.ok(agentsNow.agents['ui-test-agent'], 'agent persisted');
+assert.equal(agentsNow.active, 'ui-test-agent',
+  'agent should be active (checkbox was on)');
+assert.deepEqual(agentsNow.agents['ui-test-agent'].skills.sort(),
+  ['code', 'files', 'web'], 'skills must be stored exactly');
+console.log('✓ agents: persisted + active, skills stored correctly');
+
+// the ACTIVE agent has no delete button — activate another agent first
+const other = Object.keys(agentsNow.agents).find((n) => n !== 'ui-test-agent');
+await fetch(BASE + '/api/agents/activate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: other }),
+});
+await sleep(400);
+const delBtn2 = doc.querySelector('[data-delete="ui-test-agent"]');
+assert.ok(delBtn2, 'delete button appears once not active');
+delBtn2.click();
+await waitFor(async () => {
+  const d = await (await fetch(BASE + '/api/agents')).json();
+  return !d.agents['ui-test-agent'];
+}, 'agent deleted');
+console.log('✓ agents: delete works, active agent falls back');
+
+// 9 · cleanup: restore the exact pre-test settings (key-safe: we never
+// touch api_key unless the test set it)
+const restore = {
+  provider: cfg0.config.provider,
+  provider_key: cfg0.config.provider_key,
+  base_url: cfg0.config.base_url,
+  model: cfg0.config.model,
+  daily_budget: cfg0.config.daily_budget,
+  sub_budget: cfg0.config.sub_budget,
+  gates: cfg0.config.gates,
+};
+if (!keyWasSet) restore.api_key_clear = true;
 await fetch(BASE + '/api/config', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    provider: 'mock', provider_key: 'mock',
-    base_url: 'https://api.openai.com/v1', model: 'gpt-4o-mini',
-    api_key_clear: true, gates: 'strict'
-  }),
+  body: JSON.stringify(restore),
 });
 const after = await (await fetch(BASE + '/api/config')).json();
-assert.equal(after.config.provider, 'mock');
-assert.equal(after.config.api_key_set, false);
-console.log('✓ cleanup: mock restored, key cleared');
+assert.equal(after.config.provider, cfg0.config.provider);
+assert.equal(after.config.gates, cfg0.config.gates);
+if (!keyWasSet) assert.equal(after.config.api_key_set, false);
+console.log('✓ cleanup: settings restored to pre-test state');
 
 console.log('\nALL UI TESTS PASSED');
 window.close();

@@ -171,6 +171,48 @@ class EngineTest(unittest.TestCase):
         self.assertIn('vejret', hits[0]['goal'])
         self.assertEqual(self.memory.search('xyzzy nonexistent'), [])
 
+    def test_skills_restrict_tools(self):
+        """An agent with only the 'files' skill must be denied other tools."""
+        ws = tempfile.mkdtemp(prefix='atlas_sk_')
+        d = tempfile.mkdtemp()
+        led = Ledger(os.path.join(d, 'l.jsonl'))
+        mem = Memory(os.path.join(d, 'm.json'))
+        cfg = {'provider': 'mock', 'workspace': ws, 'gates': 'advisory',
+               'skills': ['files']}
+        res = Agent(cfg, led, mem).run('write a hello module')
+        self.assertEqual(res['status'], 'completed')
+        denied = [e for e in led._entries()
+                  if e['kind'] == 'TOOL_CALL' and e['detail'].get('denied')]
+        self.assertTrue(any(e['detail'].get('tool') == 'run_tests'
+                            for e in denied),
+                        'run_tests must be denied without the code skill')
+        shutil.rmtree(ws, ignore_errors=True)
+        shutil.rmtree(d, ignore_errors=True)
+
+    def test_effective_task_cfg_resolution(self):
+        """Active agent + provider creds must resolve into the task config."""
+        import config as config_mod   # noqa: E402
+        cfg = {
+            'provider': 'openai_compat', 'base_url': 'https://x/v1',
+            'model': 'fallback-model', 'api_key': 'legacy',
+            'api_key_env': 'ATLAS_NO_SUCH_ENV',
+            'provider_key': 'groq',
+            'providers': {'groq': {
+                'base_url': 'https://api.groq.com/openai/v1',
+                'model': 'llama', 'api_key': 'gk'}},
+            'agents': {'coder': {'provider_key': 'groq',
+                                 'model': 'llama', 'skills': ['files'],
+                                 'prompt': 'Be terse.'}},
+            'active_agent': 'coder',
+        }
+        t = config_mod.effective_task_cfg(cfg)
+        self.assertEqual(t['model'], 'llama')
+        self.assertEqual(t['base_url'], 'https://api.groq.com/openai/v1')
+        self.assertEqual(t['_api_key'], 'gk')
+        self.assertEqual(t['skills'], ['files'])
+        self.assertEqual(t['agent_prompt'], 'Be terse.')
+        self.assertEqual(t['agent_name'], 'coder')
+
     def test_config_roundtrip(self):
         """Graphical settings must persist to ~/.agentui/config.json."""
         import config as cfgmod     # noqa: E402

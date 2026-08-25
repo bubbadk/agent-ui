@@ -137,6 +137,35 @@ def _run_command(cmd, ctx):
             'output': (r.stdout + r.stderr)[-4000:]}
 
 
+PLAN_TOOLS = ('set_plan', 'complete_step')
+
+SKILL_MAP = {
+    'files': ['read_file', 'write_file', 'list_dir'],
+    'code': ['run_tests'],
+    'shell': ['run_command'],
+    'web': ['web_fetch'],
+    'subagents': ['spawn_subagent'],
+}
+
+
+def allowed_names(skills):
+    """Tool names allowed for a skill list. skills=None means everything."""
+    if skills is None:
+        return None
+    allowed = set(PLAN_TOOLS)
+    for s in skills or []:
+        allowed.update(SKILL_MAP.get(s, []))
+    return allowed
+
+
+def schemas_for(skills):
+    allowed = allowed_names(skills)
+    if allowed is None:
+        return SCHEMAS
+    return [sc for sc in SCHEMAS
+            if sc['function']['name'] in allowed]
+
+
 def _compile_check(path):
     r = subprocess.run([sys.executable, '-m', 'py_compile', path],
                        capture_output=True, text=True, timeout=60)

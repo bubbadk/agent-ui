@@ -20,6 +20,10 @@ class Agent:
         self.memory = memory
         self.depth = depth
         self.provider = make_provider(cfg, cfg.get('_api_key', ''))
+        self.skills = cfg.get('skills')            # None = unrestricted
+        self.allowed = T.allowed_names(self.skills)
+        self.schemas = T.schemas_for(self.skills)
+        self.agent_prompt = cfg.get('agent_prompt', '')
 
     def log(self, kind, **kw):
         return self.ledger.append(kind, model=self.provider.name, **kw)
@@ -31,6 +35,8 @@ class Agent:
         mem = self.memory.retrieve(goal)
         system = ('[SUBAGENT depth %d] ' % self.depth
                   if self.depth else '') + SYSTEM_PROMPT
+        if self.agent_prompt:
+            system += '\n\nAgent persona:\n' + self.agent_prompt
         if mem:
             system += '\n\nRelevant memory from previous tasks:\n' + mem
 
@@ -44,7 +50,7 @@ class Agent:
         final = None
         spent = 0.0
         for _ in range(16):
-            resp = self.provider.chat(msgs, T.SCHEMAS)
+            resp = self.provider.chat(msgs, self.schemas)
             u = resp.get('usage') or {}
             tin = u.get('in', u.get('prompt_tokens', 0))
             tout = u.get('out', u.get('completion_tokens', 0))
@@ -65,6 +71,15 @@ class Agent:
 
             for tc in calls:
                 fn = tc['function']['name']
+
+                if self.allowed is not None and fn not in self.allowed:
+                    self.log('TOOL_CALL', detail={'tool': fn, 'denied': True})
+                    msgs.append({'role': 'tool',
+                                 'tool_call_id': tc.get('id'),
+                                 'content': json.dumps(
+                                     {'error': 'skill not enabled '
+                                               'for this agent'})})
+                    continue
 
                 if fn == 'set_plan':
                     try:

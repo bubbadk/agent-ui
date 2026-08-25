@@ -15,6 +15,7 @@ Routes:
 """
 import json
 import os
+import re
 import sys
 import threading
 import time
@@ -23,6 +24,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'engine'))
 
+import config as config_mod      # noqa: E402
 from agent import Agent          # noqa: E402
 from config import api_key, load  # noqa: E402
 from ledger import Ledger        # noqa: E402
@@ -107,8 +109,7 @@ def _start_task(goal):
         STATE['phase'] = 'starting'
 
     def work():
-        cfg = dict(CFG)
-        cfg['_api_key'] = api_key(CFG)
+        cfg = config_mod.effective_task_cfg(CFG)
         Agent(cfg, LEDGER, MEMORY).run(goal)
 
     threading.Thread(target=work, daemon=True).start()
@@ -128,6 +129,37 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        if self.path == '/api/models':
+            from urllib.parse import parse_qs, urlparse
+            pk = parse_qs(urlparse(self.path).query).get(
+                'provider_key', [CFG.get('provider_key', '')])[0]
+            prov = (CFG.get('providers') or {}).get(pk) or {}
+            base = prov.get('base_url') or CFG['base_url']
+            key = prov.get('api_key', '') or api_key(CFG)
+            if pk == 'mock':
+                return self._send(200, json.dumps(
+                    {'ok': True, 'models': ['mock-frontier']}))
+            try:
+                import urllib.request
+                headers = {'Authorization': 'Bearer ' + key} if key else {}
+                req = urllib.request.Request(
+                    base.rstrip('/') + '/models', headers=headers)
+                with urllib.request.urlopen(req, timeout=20) as r:
+                    d = json.load(r)
+                ids = sorted({m.get('id') for m in d.get('data', [])
+                              if m.get('id')})
+                return self._send(200, json.dumps({'ok': True, 'models': ids}))
+            except Exception as exc:              # noqa: BLE001
+                return self._send(200, json.dumps(
+                    {'ok': False, 'error': str(exc)[:300]}))
+        if self.path == '/api/agents':
+            return self._send(200, json.dumps({
+                'ok': True,
+                'agents': CFG.get('agents', {}),
+                'active': CFG.get('active_agent', ''),
+                'provider_keys': ['mock'] +
+                    sorted((CFG.get('providers') or {}).keys()),
+            }))
         if self.path == '/api/config':
             return self._send(200, json.dumps({'ok': True, 'config': {
                 'provider': CFG['provider'],
@@ -198,6 +230,7 @@ class Handler(BaseHTTPRequestHandler):
                 'tree': _tree(),
                 'caps': grants,
                 'phase': st['phase'],
+                'agent': CFG.get('active_agent', ''),
             }))
         path = self.path.lstrip('/') or 'fusion/concept-4-fusion.html'
         if path == 'live.js':
@@ -213,6 +246,68 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read(), ctype)
 
     def do_POST(self):
+        if self.path == '/api/agents':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            name = str(body.get('name', '')).strip().lower()
+            if not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,31}', name):
+                return self._send(400, json.dumps(
+                    {'error': 'name must be a-z, 0-9, dash (max 32)'}))
+            pk = str(body.get('provider_key', 'mock'))
+            if pk != 'mock' and pk not in (CFG.get('providers') or {}):
+                return self._send(400, json.dumps(
+                    {'error': 'provider "%s" is not configured yet '
+                              '(add it under SETTINGS first)' % pk}))
+            skills = [s for s in (body.get('skills') or [])
+                      if s in config_mod.ALL_SKILLS]
+            CFG.setdefault('agents', {})[name] = {
+                'label': str(body.get('label') or name)[:60],
+                'provider_key': pk,
+                'model': str(body.get('model', '')).strip()[:120],
+                'skills': skills,
+                'prompt': str(body.get('prompt', ''))[:2000],
+            }
+            if body.get('activate'):
+                CFG['active_agent'] = name
+            config_mod.save(CFG)
+            return self._send(200, json.dumps({
+                'ok': True, 'name': name,
+                'active': CFG['active_agent'],
+                'agents': CFG['agents']}))
+        if self.path == '/api/agents/activate':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            name = str(body.get('name', ''))
+            if name not in (CFG.get('agents') or {}):
+                return self._send(404, '{"error":"unknown agent"}')
+            CFG['active_agent'] = name
+            config_mod.save(CFG)
+            return self._send(200, json.dumps({'ok': True, 'active': name}))
+        if self.path == '/api/agents/delete':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            name = str(body.get('name', ''))
+            agents = CFG.get('agents') or {}
+            if name not in agents:
+                return self._send(404, '{"error":"unknown agent"}')
+            if len(agents) < 2:
+                return self._send(400,
+                                  '{"error":"cannot delete the last agent"}')
+            del agents[name]
+            if CFG.get('active_agent') == name:
+                CFG['active_agent'] = next(iter(agents))
+            config_mod.save(CFG)
+            return self._send(200, json.dumps(
+                {'ok': True, 'active': CFG['active_agent']}))
         if self.path == '/api/config':
             try:
                 n = int(self.headers.get('Content-Length', 0))
@@ -242,7 +337,6 @@ class Handler(BaseHTTPRequestHandler):
                 CFG['api_key'] = ''
             if body.get('provider_key'):
                 CFG['provider_key'] = str(body['provider_key'])
-            import config as config_mod
             config_mod.save(CFG)
             return self._send(200, json.dumps({
                 'ok': True, 'provider': CFG['provider'],

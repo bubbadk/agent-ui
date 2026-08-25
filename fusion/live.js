@@ -130,6 +130,12 @@
 
   function render(s) {
     lastState = s;
+    var ed = 'FUSION \u00b7 LIVE ENGINE (' + s.provider +
+      (s.agent ? ' \u00b7 agent: ' + s.agent : '') + ')';
+    if (render._ed !== ed) {
+      render._ed = ed;
+      document.querySelector('.edition').textContent = ed;
+    }
     renderConsole(s.ledger);
     renderTree(s.tree || []);
     renderTable(s.ledger);
@@ -142,7 +148,7 @@
     el('budBar').style.width =
       Math.min(100, s.budget.spent / s.budget.limit * 100) + '%';
     if (currentView !== 'dashboard' && currentView !== 'settings' &&
-        currentView !== 'memory') renderPage(s);
+        currentView !== 'memory' && currentView !== 'agents') renderPage(s);
   }
 
   function renderEconomy(s) {
@@ -281,9 +287,16 @@
           'style="font-family:var(--mono);font-size:12px;color:var(--acc);' +
           'word-break:break-all"></a></div>' +
           '<div class="crow"><div class="clab">Model<small>' +
-          'e.g. gpt-4o-mini, claude-sonnet-4, llama3 (local)</small></div>' +
-          '<input id="cfgModel" value="' + esc(c.model) + '" style="' +
-          inputStyle() + '"></div>' +
+          'e.g. gpt-4o-mini \u00b7 use \u21bb MODELS to fetch the live list ' +
+          '(saves first, needs a key)</small></div>' +
+          '<div style="display:flex;gap:8px">' +
+          '<input id="cfgModel" list="cfgModelList" value="' + esc(c.model) +
+          '" style="flex:1;background:none;border:1px solid var(--gborder);' +
+          'color:inherit;font-family:var(--mono);font-size:12px;' +
+          'padding:8px 12px;border-radius:8px">' +
+          '<button class="tbtn" id="cfgModelsBtn" type="button">\u21bb MODELS' +
+          '</button></div>' +
+          '<datalist id="cfgModelList"></datalist></div>' +
           '<div class="crow"><div class="clab">Base URL<small>' +
           'OpenAI-compatible endpoint</small></div>' +
           '<input id="cfgBase" value="' + esc(c.base_url) + '" style="' +
@@ -379,6 +392,23 @@
           el('cfgMsg').style.color = good ? 'var(--good)' : 'var(--bad)';
         }
 
+        el('cfgModelsBtn').onclick = function () {
+          msg('Saving, then fetching model list\u2026', true);
+          save().then(function () {
+            fetch('/api/models?provider_key=' + encodeURIComponent(sel),
+              { cache: 'no-store' })
+              .then(function (r) { return r.json(); })
+              .then(function (d2) {
+                if (d2.ok) {
+                  el('cfgModelList').innerHTML = d2.models.map(function (m) {
+                    return '<option value="' + esc(m) + '">';
+                  }).join('');
+                  msg(d2.models.length +
+                    ' models loaded \u2014 click the model field', true);
+                } else { msg('Model list failed: ' + d2.error, false); }
+              });
+          });
+        };
         el('cfgSave').onclick = function () {
           save().then(function (d) {
             if (d.ok) {
@@ -643,6 +673,152 @@
     if (overlayEl) overlayEl.classList.remove('open');
   }
 
+  function renderAgents(d) {
+    var cards = Object.keys(d.agents).map(function (name) {
+      var a = d.agents[name];
+      var active = d.active === name;
+      return '<div class="glass card" style="margin-bottom:14px">' +
+        '<h3 class="ct">' + esc(name).toUpperCase() +
+        (active ? ' \u00b7 <span style="color:var(--good)">ACTIVE</span>' : '') +
+        '</h3>' +
+        '<div class="memrow"><span>Provider</span><b>' +
+        esc(a.provider_key) + '</b></div>' +
+        '<div class="memrow"><span>Model</span><b>' +
+        esc(a.model || '-') + '</b></div>' +
+        '<div class="memrow"><span>Skills</span><b>' +
+        esc((a.skills || []).join(', ') || 'none') + '</b></div>' +
+        (a.prompt ? '<div style="font-style:italic;color:var(--mut);' +
+          'font-size:13px;margin-top:8px">' + esc(a.prompt) + '</div>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:12px">' +
+        (active ? '' : '<button class="tbtn on" data-activate="' +
+          esc(name) + '">ACTIVATE</button>') +
+        '<button class="tbtn" data-delete="' + esc(name) +
+        '" style="color:var(--bad);border-color:var(--bad)">DELETE</button>' +
+        '</div></div>';
+    }).join('');
+    var provOpts = d.provider_keys.map(function (k) {
+      return '<option value="' + esc(k) + '">' + esc(k) + '</option>';
+    }).join('');
+    var skillBoxes = ['files', 'code', 'shell', 'web', 'subagents']
+      .map(function (s) {
+        return '<label style="display:flex;gap:6px;align-items:center;' +
+          'font-family:var(--mono);font-size:11px;margin-right:12px">' +
+          '<input type="checkbox" value="' + s + '" checked> ' + s + '</label>';
+      }).join('');
+    pageEl.innerHTML =
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+      '<div>' + (cards ||
+        '<div class="glass card"><p style="font-style:italic;color:var(--mut)">No agents yet.</p></div>') +
+      '</div>' +
+      '<div class="glass card">' +
+      '<h3 class="ct">NEW AGENT</h3>' +
+      '<div class="crow"><div class="clab">Name<small>a-z, 0-9, dash</small></div>' +
+      '<input id="agName" style="' + inputStyle() + '"></div>' +
+      '<div class="crow"><div class="clab">Provider<small>' +
+      'configured under SETTINGS \u2014 or mock</small></div>' +
+      '<select id="agProv" style="' + inputStyle() + '">' + provOpts +
+      '</select></div>' +
+      '<div class="crow"><div class="clab">Model<small>\u21bb fetches the ' +
+      'live model list from the provider</small></div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<input id="agModel" list="agModels" style="flex:1;background:none;' +
+      'border:1px solid var(--gborder);color:inherit;font-family:var(--mono);' +
+      'font-size:12px;padding:8px 12px;border-radius:8px">' +
+      '<button class="tbtn" id="agModelsBtn" type="button">\u21bb MODELS</button>' +
+      '</div><datalist id="agModels"></datalist></div>' +
+      '<div class="crow"><div class="clab">Skills<small>' +
+      'what this agent may do</small></div><div id="agSkills">' +
+      skillBoxes + '</div></div>' +
+      '<div class="crow" style="border-bottom:0"><div class="clab">' +
+      'Persona prompt<small>optional extra instructions</small></div>' +
+      '<textarea id="agPrompt" rows="3" style="width:100%;background:none;' +
+      'border:1px solid var(--gborder);color:inherit;font-family:var(--serif);' +
+      'font-size:14px;padding:8px;border-radius:8px"></textarea></div>' +
+      '<div style="display:flex;gap:12px;margin-top:14px;align-items:center">' +
+      '<button class="tbtn on" id="agSave">SAVE AGENT</button>' +
+      '<label style="display:flex;gap:6px;align-items:center;font-size:12px">' +
+      '<input type="checkbox" id="agActivate" checked> activate immediately' +
+      '</label></div></div></div>';
+    wireAgents(pageEl);
+  }
+  function wireAgents(scope) {
+    scope.querySelectorAll('[data-activate]').forEach(function (b) {
+      b.onclick = function () {
+        fetch('/api/agents/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: b.dataset.activate })
+        }).then(function (r) { return r.json(); })
+          .then(function (d2) {
+            toast('Agent active: ' + d2.active);
+            loadAgents();
+          });
+      };
+    });
+    scope.querySelectorAll('[data-delete]').forEach(function (b) {
+      b.onclick = function () {
+        fetch('/api/agents/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: b.dataset.delete })
+        }).then(function (r) { return r.json(); })
+          .then(function (d2) {
+            toast(d2.ok ? 'Agent deleted' : d2.error);
+            loadAgents();
+          });
+      };
+    });
+    var modelsBtn = scope.querySelector('#agModelsBtn');
+    if (modelsBtn) modelsBtn.onclick = function () {
+      var pk = el('agProv').value;
+      fetch('/api/models?provider_key=' + encodeURIComponent(pk),
+        { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(function (d2) {
+          if (d2.ok) {
+            el('agModels').innerHTML = d2.models.map(function (m) {
+              return '<option value="' + esc(m) + '">';
+            }).join('');
+            toast(d2.models.length +
+              ' models loaded \u2014 click the model field');
+          } else { toast('Model list failed: ' + d2.error); }
+        });
+    };
+    var saveBtn = scope.querySelector('#agSave');
+    if (saveBtn) saveBtn.onclick = function () {
+      var name = el('agName').value.trim();
+      var skills = [];
+      scope.querySelectorAll('#agSkills input:checked').forEach(function (i) {
+        skills.push(i.value);
+      });
+      fetch('/api/agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          label: name,
+          provider_key: el('agProv').value,
+          model: el('agModel').value.trim(),
+          skills: skills,
+          prompt: el('agPrompt').value,
+          activate: el('agActivate').checked
+        })
+      }).then(function (r) { return r.json(); })
+        .then(function (d2) {
+          if (d2.ok) { toast('Agent saved: ' + name); loadAgents(); }
+          else toast('Error: ' + (d2.error || 'unknown'));
+        });
+    };
+  }
+
+  function loadAgents() {
+    fetch('/api/agents', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (currentView === 'agents') renderAgents(d);
+      });
+  }
+
   function showView(v) {
     currentView = v;
     var dash = document.querySelector('.main3');
@@ -664,6 +840,14 @@
             .catch(function () {});
         } else if (v === 'settings') {
           renderSettings();
+        } else if (v === 'agents') {
+          pageEl.innerHTML = '<div class="glass card"><h3 class="ct">AGENTS \u00b7 LOADING\u2026</h3></div>';
+          fetch('/api/agents', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (currentView === 'agents') renderAgents(d);
+            })
+            .catch(function () {});
         } else if (lastState) renderPage(lastState);
       }
     }
@@ -708,7 +892,7 @@
       'overview': 'dashboard', 'plans & tasks': 'plans',
       'memory': 'memory', 'verification': 'verification',
       'economy': 'economy', 'security': 'security',
-      'sessions': 'sessions', 'settings': 'settings'
+      'sessions': 'sessions', 'settings': 'settings', 'agents': 'agents'
     };
     document.querySelectorAll('.navbtn').forEach(function (b) {
       var name = b.textContent.trim().toLowerCase();
