@@ -19,6 +19,7 @@ import re
 import sys
 import threading
 import time
+from urllib.parse import urlparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,8 +130,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path == '/api/models':
-            from urllib.parse import parse_qs, urlparse
+        # NB: self.path includes the query string — match on the path part
+        if urlparse(self.path).path == '/api/models':
+            from urllib.parse import parse_qs
             pk = parse_qs(urlparse(self.path).query).get(
                 'provider_key', [CFG.get('provider_key', '')])[0]
             prov = (CFG.get('providers') or {}).get(pk) or {}
@@ -184,7 +186,7 @@ class Handler(BaseHTTPRequestHandler):
                 'episodes': list(reversed(MEMORY.episodes[-50:])),
             }))
         if self.path.startswith('/api/memory'):
-            from urllib.parse import parse_qs, urlparse
+            from urllib.parse import parse_qs
             q = parse_qs(urlparse(self.path).query).get('q', [''])[0]
             if q:
                 return self._send(200, json.dumps({
@@ -197,7 +199,7 @@ class Handler(BaseHTTPRequestHandler):
                 'episodes': list(reversed(MEMORY.episodes[-50:])),
             }))
         if self.path.startswith('/api/task_events'):
-            from urllib.parse import parse_qs, urlparse
+            from urllib.parse import parse_qs
             start = int(parse_qs(urlparse(self.path).query)
                         .get('start', ['0'])[0])
             events = []
