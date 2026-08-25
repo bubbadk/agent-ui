@@ -55,13 +55,16 @@ class Agent:
 
             for tc in calls:
                 fn = tc['function']['name']
-                if fn in ('write_file', 'run_tests') and \
-                        'fs:write' not in granted:
-                    granted.add('fs:write')
+                scope = None
+                if fn in ('write_file', 'run_tests'):
+                    scope = ('fs:write ' +
+                             os.path.basename(self.cfg['workspace']) + '/')
+                elif fn == 'web_fetch':
+                    scope = 'net:get'
+                if scope and scope not in granted:
+                    granted.add(scope)
                     self.log('CAPABILITY_GRANTED', detail={
-                        'scope': 'fs:write ' +
-                                 os.path.basename(self.cfg['workspace']) + '/',
-                        'reason': 'required by plan'})
+                        'scope': scope, 'reason': 'required by plan'})
                 try:
                     args = json.loads(tc['function'].get('arguments') or '{}')
                 except ValueError:
@@ -92,4 +95,4 @@ class Agent:
         self.log('COMMITTED', detail={'files': list(ctx.written)})
         self.log('TASK_COMPLETED', detail={'summary': (final or '')[:300]})
         self.memory.add(goal, final or '')
-        return {'status': 'completed'}
+        return {'status': 'completed', 'summary': final or ''}

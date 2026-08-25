@@ -85,6 +85,20 @@
       '$' + s.budget.spent.toFixed(2) + '/$' + s.budget.limit.toFixed(0);
     el('budBar').style.width =
       Math.min(100, s.budget.spent / s.budget.limit * 100) + '%';
+
+    var fin = null;
+    s.ledger.forEach(function (e) {
+      if (e.kind === 'TASK_COMPLETED' || e.kind === 'TASK_BLOCKED') fin = e;
+    });
+    if (fin && fin.id !== render._lastReply) {
+      render._lastReply = fin.id;
+      var body = el('replyBody');
+      if (body) {
+        body.textContent = (fin.kind === 'TASK_BLOCKED'
+          ? 'BLOCKED — ' : '') + (fin.detail.summary || fin.detail.reason || '');
+        reply.style.display = fin.detail.summary || fin.detail.reason ? '' : 'none';
+      }
+    }
   }
 
   async function init() {
@@ -102,6 +116,14 @@
       'font-family:var(--mono);font-size:12px;padding:9px 12px;border-radius:99px">' +
       '<button type="submit" class="tbtn" style="border-color:var(--acc);color:var(--acc)">RUN</button>';
     el('console').insertAdjacentElement('beforebegin', form);
+
+    var reply = document.createElement('div');
+    reply.className = 'glass card';
+    reply.style.cssText = 'margin-bottom:16px;display:none';
+    reply.innerHTML = '<h3 class="ct">AGENT REPLY</h3>' +
+      '<div id="replyBody" style="font-style:italic;line-height:1.65"></div>';
+    form.insertAdjacentElement('afterend', reply);
+
     form.onsubmit = async function (ev) {
       ev.preventDefault();
       var g = el('goalIn').value.trim();

@@ -59,6 +59,37 @@ class EngineTest(unittest.TestCase):
         hit = self.memory.retrieve('create hello module')
         self.assertIn('hello', hit.lower())
 
+    def test_mock_answers_weather_honestly(self):
+        """Weather goals must be refused honestly, not silently ignored."""
+        ws = tempfile.mkdtemp(prefix='atlas_wx_')
+        d = tempfile.mkdtemp()
+        led = Ledger(os.path.join(d, 'l.jsonl'))
+        mem = Memory(os.path.join(d, 'm.json'))
+        cfg = {'provider': 'mock', 'workspace': ws, 'gates': 'strict'}
+        res = Agent(cfg, led, mem).run('hvordan er vejret i nyborg')
+        self.assertEqual(res['status'], 'completed')
+        summary = res.get('summary') or ''
+        kinds = [e['kind'] for e in led._entries()]
+        self.assertIn('TASK_COMPLETED', kinds)
+        # no files should have been written for a weather question
+        self.assertEqual([e for e in led._entries()
+                          if e['kind'] == 'TOOL_CALL'
+                          and e['detail'].get('tool') == 'write_file'], [])
+        self.assertIn('mock', summary.lower())
+        shutil.rmtree(ws, ignore_errors=True)
+        shutil.rmtree(d, ignore_errors=True)
+
+    def test_web_fetch_ssrf_guard(self):
+        from tools import _url_allowed  # noqa: E402
+        ok, _ = _url_allowed('https://wttr.in/nyborg?format=3')
+        self.assertTrue(ok)
+        ok, why = _url_allowed('file:///etc/passwd')
+        self.assertFalse(ok)
+        ok, why = _url_allowed('http://127.0.0.1:8123/')
+        self.assertFalse(ok)
+        ok, why = _url_allowed('http://10.0.0.1/')
+        self.assertFalse(ok)
+
     def test_strict_gate_blocks_on_failure(self):
         ws = tempfile.mkdtemp(prefix='atlas_bad_')
         d = tempfile.mkdtemp()

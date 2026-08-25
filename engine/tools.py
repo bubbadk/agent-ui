@@ -30,7 +30,46 @@ SCHEMAS = [
                        '(acceptance check). Defaults to every .py written this task.',
         'parameters': {'type': 'object',
                        'properties': {'target': {'type': 'string'}}}}},
+    {'type': 'function', 'function': {
+        'name': 'web_fetch',
+        'description': 'Fetch an http(s) URL and return the response body as '
+                       'text (first 4000 chars). Example: '
+                       'https://wttr.in/nyborg?format=3 for weather.',
+        'parameters': {'type': 'object',
+                       'properties': {'url': {'type': 'string'}},
+                       'required': ['url']}}},
 ]
+
+
+def _url_allowed(url):
+    """Block non-http(s) schemes and private/loopback targets (SSRF guard)."""
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+    u = urlparse(url)
+    if u.scheme not in ('http', 'https') or not u.hostname:
+        return False, 'only http(s) URLs are allowed'
+    try:
+        infos = socket.getaddrinfo(u.hostname, None)
+    except OSError as exc:
+        return False, 'cannot resolve host: %s' % exc
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0])
+        if (ip.is_private or ip.is_loopback or ip.is_link_local or
+                ip.is_reserved or ip.is_multicast):
+            return False, 'refusing to fetch private/loopback address'
+    return True, ''
+
+
+def _web_fetch(url):
+    import urllib.request
+    ok, reason = _url_allowed(url)
+    if not ok:
+        raise PermissionError(reason)
+    req = urllib.request.Request(url, headers={'User-Agent': 'atlas-agent/0.1'})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        body = r.read(20000).decode('utf-8', 'replace')
+    return body[:4000]
 
 
 class ToolContext:
@@ -98,5 +137,9 @@ def _dispatch(name, args, ctx):
             results.append({'file': os.path.relpath(t, ctx.ws),
                             'pass': ok, 'output': out})
         return {'ok': all(r['pass'] for r in results), 'results': results}
+
+    if name == 'web_fetch':
+        body = _web_fetch(args['url'])
+        return {'ok': True, 'url': args['url'], 'body': body}
 
     return {'error': 'unknown tool: %s' % name}

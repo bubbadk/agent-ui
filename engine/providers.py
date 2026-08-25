@@ -5,9 +5,27 @@ import urllib.request
 
 class MockProvider:
     """Scripted provider so the full pipeline runs without an API key."""
+
     name = 'mock-frontier'
 
     def chat(self, messages, tools=None):
+        goal = ''
+        for m in messages:
+            if m.get('role') == 'user':
+                goal = m['content']
+        gl = goal.lower()
+
+        # Honest refusal for things the scripted mock cannot do.
+        weather = any(w in gl for w in ('weather', 'vejr', 'forecast'))
+        if weather:
+            return {'message': {'role': 'assistant', 'content':
+                'I cannot check the weather: I am running on the scripted '
+                'mock provider, which has no network access. Start the engine '
+                'with a real model (provider "openai_compat" in '
+                '~/.agentui/config.json) and I will fetch '
+                'https://wttr.in/nyborg?format=3 via the web_fetch tool.'},
+                'usage': {'prompt_tokens': 60, 'completion_tokens': 55}}
+
         n = sum(1 for m in messages if m.get('role') == 'assistant')
         if n == 0:
             msg = {
