@@ -19,6 +19,19 @@ class Memory:
                 except ValueError:
                     self.episodes = []
 
+    def search(self, query, k=8):
+        """Return episodes matching query words, best overlap first."""
+        words = set(re.findall(r'[a-zæøå]{3,}', query.lower()))
+        scored = []
+        for ep in self.episodes:
+            ew = set(re.findall(r'[a-zæøå]{3,}', (
+                ep.get('goal', '') + ' ' + ep.get('outcome', '')).lower()))
+            overlap = len(words & ew)
+            if overlap:
+                scored.append((overlap, ep))
+        scored.sort(key=lambda x: -x[0])
+        return [ep for _, ep in scored[:k]]
+
     def add(self, goal, outcome):
         with self.lock:
             self.episodes.append({

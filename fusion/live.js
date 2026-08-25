@@ -18,6 +18,8 @@
   var lastState = null;
   var currentView = 'dashboard';
   var pageEl = null;
+  var memoryQuery = '';
+  var replayEv = [], replayIdx = 0, replayTimer = null, overlayEl = null;
 
   function el(id) { return document.getElementById(id); }
   function esc(x) {
@@ -186,7 +188,7 @@
     s.ledger.forEach(function (e) {
       if (e.kind === 'TASK_STARTED') {
         cur = { goal: e.detail.goal || '(no goal)', cost: 0,
-                status: 'running', summary: '' };
+                status: 'running', summary: '', start: e.id };
         tasks.push(cur);
       } else if (cur) {
         if (e.cost) cur.cost += e.cost;
@@ -209,11 +211,17 @@
           '<span class="ti">' + esc(t.goal) +
           (t.summary ? '<br><small style="color:var(--mut)">' +
            esc(t.summary.slice(0, 140)) + '</small>' : '') +
+          '<br><button class="tbtn" data-replay="' + t.start +
+          '" style="margin-top:7px;font-size:10px;padding:3px 12px">' +
+          '\u23f5 REPLAY</button>' +
           '</span><span class="st">' + t.status + ' \u00b7 $' +
           t.cost.toFixed(4) + '</span></div>';
       }).join('')
         : '<p style="font-style:italic;color:var(--mut)">No tasks in the recent ledger window.</p>') +
       '</div>';
+    pageEl.querySelectorAll('[data-replay]').forEach(function (b) {
+      b.onclick = function () { openReplay(parseInt(b.dataset.replay, 10)); };
+    });
   }
 
   function renderPage(s) {
@@ -261,15 +269,34 @@
   }
 
   function renderMemory(d) {
-    var eps = d.episodes || [];
+    var eps = d.results || d.episodes || [];
+    var head = d.results != null
+      ? 'MEMORY \u00b7 SEARCH \u201c' + esc(d.query || '') + '\u201d (' +
+        eps.length + ' hits)'
+      : 'MEMORY \u00b7 EPISODIC STORE (' + d.count + ' entries)';
     pageEl.innerHTML = '<div class="glass card">' +
-      '<h3 class="ct">MEMORY \u00b7 EPISODIC STORE (' + d.count + ' entries)</h3>' +
+      '<h3 class="ct">' + head + '</h3>' +
+      '<form id="memSearch" style="display:flex;gap:8px;margin-bottom:14px">' +
+      '<input id="memQ" placeholder="Ask memory\u2026 e.g. weather, report" ' +
+      'style="flex:1;background:none;border:1px solid var(--gborder);' +
+      'color:inherit;font-family:var(--mono);font-size:12px;' +
+      'padding:8px 12px;border-radius:99px">' +
+      '<button type="submit" class="tbtn" style="border-color:var(--acc);' +
+      'color:var(--acc)">SEARCH</button></form>' +
       (eps.length ? eps.map(function (ep) {
         return nodeRow('', '\u25c6', ep.goal,
           ep.t + ' \u00b7 ' + ep.outcome, 'memory');
       }).join('') :
         '<p style="font-style:italic;color:var(--mut)">No episodes yet \u2014 completed tasks are remembered here.</p>') +
       '</div>';
+    el('memSearch').onsubmit = function (ev) {
+      ev.preventDefault();
+      memoryQuery = el('memQ').value.trim();
+      fetch('/api/memory?q=' + encodeURIComponent(memoryQuery),
+        { cache: 'no-store' })
+        .then(function (r) { return r.json(); })
+        .then(renderMemory);
+    };
   }
 
   function renderVerification(s) {
@@ -292,12 +319,32 @@
     }).join('');
     pageEl.innerHTML = '<div class="glass card">' +
       '<h3 class="ct">VERIFICATION \u00b7 GATE MODE</h3>' +
+      '<div style="display:flex;gap:8px;margin-bottom:14px">' +
+      ['strict', 'advisory', 'draft'].map(function (g) {
+        return '<button class="tbtn' + (s.gates === g ? ' on' : '') +
+          '" data-gate="' + g + '">' + g.toUpperCase() + '</button>';
+      }).join('') + '</div>' +
       '<div style="font-family:var(--mono);font-size:12px;margin-bottom:14px">' +
-      'MODE: <b style="color:var(--acc)">' + esc(s.gates.toUpperCase()) +
-      '</b> \u00b7 RUNS: ' + runs.length +
+      'RUNS: ' + runs.length +
       ' \u00b7 PASSED: <b style="color:var(--good)">' + passed + '</b></div>' +
       (list || '<p style="font-style:italic;color:var(--mut)">No gate runs yet.</p>') +
       '</div>';
+    pageEl.querySelectorAll('[data-gate]').forEach(function (b) {
+      b.onclick = function () {
+        fetch('/api/gates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gates: b.dataset.gate })
+        }).then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.ok && lastState) {
+              lastState.gates = d.gates;
+              toast('Verify gates: ' + d.gates.toUpperCase());
+              renderVerification(lastState);
+            }
+          });
+      };
+    });
   }
 
   function renderSecurity(s) {
@@ -332,6 +379,97 @@
       }).join('') :
         '<p style="font-style:italic;color:var(--mut)">None in the recent window. Default-deny holds.</p>') +
       '</div>';
+  }
+
+  /* ── task replay ─────────────────────────── */
+  function ensureOverlay() {
+    if (overlayEl) return;
+    overlayEl = document.createElement('div');
+    overlayEl.className = 'pal-ov';
+    overlayEl.style.paddingTop = '8vh';
+    overlayEl.innerHTML = '<div class="pal" style="width:min(700px,94vw)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:1px solid var(--rule)">' +
+      '<b style="font-family:var(--mono);font-size:12px;letter-spacing:.2em">TASK REPLAY</b>' +
+      '<span style="font-family:var(--mono);font-size:11px;color:var(--mut)" id="repPos"></span></div>' +
+      '<div id="repFrame" style="padding:18px;min-height:180px;font-size:14px;line-height:1.6"></div>' +
+      '<div style="display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--rule)">' +
+      '<button class="tbtn" id="repFirst">\u23ee</button>' +
+      '<button class="tbtn" id="repPrev">\u25c0</button>' +
+      '<button class="tbtn" id="repPlay">\u25b6</button>' +
+      '<button class="tbtn" id="repNext">\u25b6</button>' +
+      '<span style="flex:1"></span>' +
+      '<button class="tbtn" id="repClose">CLOSE</button></div></div>';
+    document.body.appendChild(overlayEl);
+    overlayEl.addEventListener('click', function (e) {
+      if (e.target === overlayEl) closeReplay();
+    });
+    el('repClose').onclick = closeReplay;
+    el('repFirst').onclick = function () { replayIdx = 0; drawReplay(); };
+    el('repPrev').onclick = function () {
+      if (replayIdx > 0) { replayIdx--; drawReplay(); }
+    };
+    el('repNext').onclick = stepReplay;
+    el('repPlay').onclick = function () {
+      if (replayTimer) {
+        clearInterval(replayTimer); replayTimer = null;
+        el('repPlay').textContent = '\u25b6';
+      } else {
+        el('repPlay').textContent = '\u23f8';
+        replayTimer = setInterval(function () {
+          if (replayIdx >= replayEv.length - 1) {
+            clearInterval(replayTimer); replayTimer = null;
+            el('repPlay').textContent = '\u25b6';
+            return;
+          }
+          stepReplay();
+        }, 700);
+      }
+    };
+  }
+
+  function stepReplay() {
+    if (replayIdx < replayEv.length - 1) { replayIdx++; drawReplay(); }
+  }
+
+  function drawReplay() {
+    var e = replayEv[replayIdx];
+    if (!e) return;
+    el('repPos').textContent = (replayIdx + 1) + ' / ' + replayEv.length;
+    var d = e.detail || {};
+    var lines = Object.keys(d).map(function (k) {
+      var v = typeof d[k] === 'object' ? JSON.stringify(d[k]) : d[k];
+      return '<div style="font-family:var(--mono);font-size:12px;color:var(--mut)">' +
+        esc(k) + ': ' + esc(v).slice(0, 220) + '</div>';
+    }).join('');
+    el('repFrame').innerHTML =
+      '<div style="font-family:var(--mono);font-size:11px;color:var(--mut);margin-bottom:8px">' +
+      e.t + '</div>' +
+      '<div style="margin-bottom:10px"><span class="tag ' +
+      (TAGMAP[e.kind] || 'tg-ok') + '">' +
+      e.kind.replace('TASK_', '').replace('_', ' ') + '</span></div>' +
+      (lines || '<em style="color:var(--mut)">no detail</em>');
+  }
+
+  function openReplay(startId) {
+    ensureOverlay();
+    overlayEl.classList.add('open');
+    el('repFrame').innerHTML = '<em style="color:var(--mut)">Loading\u2026</em>';
+    fetch('/api/task_events?start=' + startId, { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        replayEv = d.events || [];
+        replayIdx = 0;
+        if (replayTimer) {
+          clearInterval(replayTimer); replayTimer = null;
+          el('repPlay').textContent = '\u25b6';
+        }
+        drawReplay();
+      });
+  }
+
+  function closeReplay() {
+    if (replayTimer) { clearInterval(replayTimer); replayTimer = null; }
+    if (overlayEl) overlayEl.classList.remove('open');
   }
 
   function showView(v) {

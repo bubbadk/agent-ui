@@ -163,6 +163,14 @@ class EngineTest(unittest.TestCase):
         shutil.rmtree(ws, ignore_errors=True)
         shutil.rmtree(d, ignore_errors=True)
 
+    def test_memory_search(self):
+        self.memory.add('write a hello module', 'completed fine')
+        self.memory.add('hvordan er vejret i nyborg', 'sunny 21C')
+        hits = self.memory.search('weather in nyborg')
+        self.assertGreaterEqual(len(hits), 1)
+        self.assertIn('vejret', hits[0]['goal'])
+        self.assertEqual(self.memory.search('xyzzy nonexistent'), [])
+
     def test_subagent_depth_limit(self):
         """A depth-2 agent must not spawn further subagents."""
         ws = tempfile.mkdtemp(prefix='atlas_deep_')

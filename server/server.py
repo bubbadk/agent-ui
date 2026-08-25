@@ -8,7 +8,9 @@ Routes:
   GET  /live.js              UI wiring for live engine mode
   GET  /api/health           {"ok":true,"provider":...}
   GET  /api/state            ledger tail, plan tree, grants, budget
-  GET  /api/memory           episodic memory entries
+  GET  /api/memory           episodic memory (?q=... for keyword search)
+  GET  /api/task_events      ?start=<TASK_STARTED id> — one task's full event block
+  POST /api/gates            {"gates":"strict|advisory|draft"} — runtime switch
   POST /api/task             {"goal": "..."} — starts the agent in a thread
 """
 import json
@@ -137,6 +139,33 @@ class Handler(BaseHTTPRequestHandler):
                 'count': len(MEMORY.episodes),
                 'episodes': list(reversed(MEMORY.episodes[-50:])),
             }))
+        if self.path.startswith('/api/memory'):
+            from urllib.parse import parse_qs, urlparse
+            q = parse_qs(urlparse(self.path).query).get('q', [''])[0]
+            if q:
+                return self._send(200, json.dumps({
+                    'ok': True, 'query': q,
+                    'results': MEMORY.search(q),
+                }))
+            return self._send(200, json.dumps({
+                'ok': True,
+                'count': len(MEMORY.episodes),
+                'episodes': list(reversed(MEMORY.episodes[-50:])),
+            }))
+        if self.path.startswith('/api/task_events'):
+            from urllib.parse import parse_qs, urlparse
+            start = int(parse_qs(urlparse(self.path).query)
+                        .get('start', ['0'])[0])
+            events = []
+            started = False
+            for e in LEDGER._entries():
+                if started and e['kind'] == 'TASK_STARTED':
+                    break
+                if e['id'] == start and e['kind'] == 'TASK_STARTED':
+                    started = True
+                if started:
+                    events.append(e)
+            return self._send(200, json.dumps({'ok': True, 'events': events}))
         if self.path == '/api/state':
             st = dict(_refresh_state())
             now = time.time()
@@ -170,6 +199,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read(), ctype)
 
     def do_POST(self):
+        if self.path == '/api/gates':
+            try:
+                n = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(n) or b'{}')
+            except ValueError:
+                return self._send(400, '{"error":"bad json"}')
+            g = body.get('gates')
+            if g not in ('strict', 'advisory', 'draft'):
+                return self._send(400, '{"error":"invalid gates"}')
+            CFG['gates'] = g
+            return self._send(200, json.dumps({'ok': True, 'gates': g}))
         if self.path != '/api/task':
             return self._send(404, '{"error":"not found"}')
         try:
