@@ -154,7 +154,7 @@ CFG['schedules'] = _normalise_schedules(CFG.get('schedules', []))
 
 def _run_scheduled(schedule):
     """Log and execute one standing order without exposing credentials."""
-    result = _start_task(schedule['goal'])
+    result = _start_task(schedule['goal'], source='scheduled')
     if result.get('started'):
         LEDGER.append('SCHEDULED_RUN', detail={
             'schedule_id': schedule['id'], 'goal': schedule['goal']})
@@ -247,8 +247,8 @@ def _tree():
             for i, p in enumerate(plan)]
 
 
-def _start_task(goal):
-    item = _enqueue_task(goal)
+def _start_task(goal, source='manual'):
+    item = _enqueue_task(goal, source=source)
     return {'started': True, 'queued': True, 'task_id': item['id'],
             'goal': goal, 'position': len(_queue_view())}
 
