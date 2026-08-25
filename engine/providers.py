@@ -15,16 +15,43 @@ class MockProvider:
                 goal = m['content']
         gl = goal.lower()
 
-        # Honest refusal for things the scripted mock cannot do.
+        # Weather: actually fetch it via the engine's web_fetch tool.
         weather = any(w in gl for w in ('weather', 'vejr', 'forecast'))
         if weather:
-            return {'message': {'role': 'assistant', 'content':
-                'I cannot check the weather: I am running on the scripted '
-                'mock provider, which has no network access. Start the engine '
-                'with a real model (provider "openai_compat" in '
-                '~/.agentui/config.json) and I will fetch '
-                'https://wttr.in/nyborg?format=3 via the web_fetch tool.'},
-                'usage': {'prompt_tokens': 60, 'completion_tokens': 55}}
+            import re
+            from urllib.parse import quote
+            m = re.search(r'(?:vejret|weather|forecast)\s+(?:i|in|for)\s+(.+?)[\s?!.]*$',
+                          goal, re.IGNORECASE)
+            city = (m.group(1) if m else goal.split()[-1]).strip() or 'nyborg'
+            n = sum(1 for x in messages if x.get('role') == 'assistant')
+            url = 'https://wttr.in/%s?format=3' % quote(city)
+            if n == 0:
+                return {'message': {
+                    'role': 'assistant',
+                    'content': 'Fetching current weather for %s.' % city,
+                    'tool_calls': [{
+                        'id': 'call_wx',
+                        'type': 'function',
+                        'function': {'name': 'web_fetch',
+                                     'arguments': json.dumps({'url': url})},
+                    }]},
+                    'usage': {'prompt_tokens': 70, 'completion_tokens': 25}}
+            # second turn: read the tool result and summarise it
+            obs = ''
+            for x in messages:
+                if x.get('role') == 'tool':
+                    obs = x.get('content', '')
+            try:
+                body = json.loads(obs).get('body', '')
+            except ValueError:
+                body = ''
+            if body:
+                text = 'Current weather — %s' % body.strip()
+            else:
+                text = ('I could not retrieve the weather right now '
+                        '(fetch failed). Raw result: %s' % obs[:200])
+            return {'message': {'role': 'assistant', 'content': text},
+                    'usage': {'prompt_tokens': 110, 'completion_tokens': 40}}
 
         n = sum(1 for m in messages if m.get('role') == 'assistant')
         if n == 0:

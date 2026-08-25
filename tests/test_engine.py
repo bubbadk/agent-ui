@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """End-to-end self test: mock provider -> tools -> verify gate -> ledger."""
+import json
 import os
 import shutil
 import sys
@@ -59,25 +60,30 @@ class EngineTest(unittest.TestCase):
         hit = self.memory.retrieve('create hello module')
         self.assertIn('hello', hit.lower())
 
-    def test_mock_answers_weather_honestly(self):
-        """Weather goals must be refused honestly, not silently ignored."""
-        ws = tempfile.mkdtemp(prefix='atlas_wx_')
-        d = tempfile.mkdtemp()
-        led = Ledger(os.path.join(d, 'l.jsonl'))
-        mem = Memory(os.path.join(d, 'm.json'))
-        cfg = {'provider': 'mock', 'workspace': ws, 'gates': 'strict'}
-        res = Agent(cfg, led, mem).run('hvordan er vejret i nyborg')
-        self.assertEqual(res['status'], 'completed')
-        summary = res.get('summary') or ''
-        kinds = [e['kind'] for e in led._entries()]
-        self.assertIn('TASK_COMPLETED', kinds)
-        # no files should have been written for a weather question
-        self.assertEqual([e for e in led._entries()
-                          if e['kind'] == 'TOOL_CALL'
-                          and e['detail'].get('tool') == 'write_file'], [])
-        self.assertIn('mock', summary.lower())
-        shutil.rmtree(ws, ignore_errors=True)
-        shutil.rmtree(d, ignore_errors=True)
+    def test_mock_weather_uses_web_fetch_and_summarises(self):
+        """Weather goals must fetch real data via web_fetch, then summarise."""
+        from providers import MockProvider  # noqa: E402
+        prov = MockProvider()
+        goal = 'hvordan er vejret i nyborg'
+        msgs = [{'role': 'user', 'content': goal}]
+
+        r1 = prov.chat(msgs)
+        calls = r1['message'].get('tool_calls') or []
+        self.assertEqual(len(calls), 1)
+        fn = calls[0]['function']
+        self.assertEqual(fn['name'], 'web_fetch')
+        self.assertIn('wttr.in', fn['arguments'])
+        self.assertIn('nyborg', fn['arguments'])
+
+        msgs.append(r1['message'])
+        msgs.append({'role': 'tool', 'tool_call_id': 'call_wx',
+                     'content': json.dumps(
+                         {'ok': True, 'url': 'https://wttr.in/nyborg?format=3',
+                          'body': 'Nyborg: ☀️ +21°C'})})
+        r2 = prov.chat(msgs)
+        self.assertNotIn('tool_calls', r2['message'])
+        self.assertIn('+21°C', r2['message']['content'])
+        self.assertIn('Nyborg', r2['message']['content'])
 
     def test_web_fetch_ssrf_guard(self):
         from tools import _url_allowed  # noqa: E402
