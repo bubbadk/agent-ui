@@ -39,6 +39,90 @@ STATE = {'phase': 'idle', 'goal': '', 'last_seen': 0, 'grants': [],
          'plan': None}
 STATE_LOCK = threading.Lock()
 SCHEDULE_LOCK = threading.Lock()
+QUEUE_LOCK = threading.Lock()
+QUEUE_PATH = os.path.join(ROOT, 'data', 'task_queue.json')
+TASK_QUEUE = []
+TASK_SEQ = 0
+
+
+def _load_queue():
+    """Load durable tasks; interrupted active work is safe to retry."""
+    global TASK_SEQ
+    try:
+        with open(QUEUE_PATH, encoding='utf-8') as f:
+            items = json.load(f)
+    except (OSError, ValueError):
+        items = []
+    if not isinstance(items, list):
+        items = []
+    for item in items:
+        if isinstance(item, dict):
+            item['status'] = 'queued'
+    TASK_QUEUE.extend(items)
+    TASK_SEQ = max((int(x.get('id', 0)) for x in TASK_QUEUE
+                    if str(x.get('id', '')).isdigit()), default=0)
+
+
+def _save_queue():
+    os.makedirs(os.path.dirname(QUEUE_PATH), exist_ok=True)
+    tmp = QUEUE_PATH + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(TASK_QUEUE, f, indent=2)
+    os.replace(tmp, QUEUE_PATH)
+
+
+def _queue_view():
+    with QUEUE_LOCK:
+        return [dict(x) for x in TASK_QUEUE]
+
+
+def _enqueue_task(goal, source='manual'):
+    global TASK_SEQ
+    with QUEUE_LOCK:
+        TASK_SEQ += 1
+        item = {'id': TASK_SEQ, 'goal': goal[:2000], 'source': source,
+                'status': 'queued', 'created': time.time()}
+        TASK_QUEUE.append(item)
+        _save_queue()
+    LEDGER.append('TASK_QUEUED', detail={'task_id': item['id'],
+                                         'goal': item['goal'],
+                                         'source': source})
+    return item
+
+
+def _task_worker(item):
+    try:
+        cfg = config_mod.effective_task_cfg(CFG)
+        Agent(cfg, LEDGER, MEMORY).run(item['goal'])
+    finally:
+        with QUEUE_LOCK:
+            TASK_QUEUE[:] = [x for x in TASK_QUEUE if x.get('id') != item['id']]
+            _save_queue()
+
+
+def _queue_loop():
+    while True:
+        _refresh_state()
+        item = None
+        with QUEUE_LOCK:
+            candidate = next((x for x in TASK_QUEUE
+                              if x.get('status') == 'queued'), None)
+            if candidate:
+                with STATE_LOCK:
+                    available = STATE['phase'] not in ('starting', 'running')
+                if available:
+                    candidate['status'] = 'running'
+                    _save_queue()
+                    item = dict(candidate)
+        if item:
+            with STATE_LOCK:
+                STATE['phase'] = 'starting'
+            _task_worker(item)
+        else:
+            time.sleep(0.5)
+
+
+_load_queue()
 
 
 def _normalise_schedules(items):
@@ -164,17 +248,9 @@ def _tree():
 
 
 def _start_task(goal):
-    with STATE_LOCK:
-        if STATE['phase'] in ('starting', 'running'):
-            return {'error': 'a task is already running'}
-        STATE['phase'] = 'starting'
-
-    def work():
-        cfg = config_mod.effective_task_cfg(CFG)
-        Agent(cfg, LEDGER, MEMORY).run(goal)
-
-    threading.Thread(target=work, daemon=True).start()
-    return {'started': True, 'goal': goal}
+    item = _enqueue_task(goal)
+    return {'started': True, 'queued': True, 'task_id': item['id'],
+            'goal': goal, 'position': len(_queue_view())}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -298,7 +374,11 @@ class Handler(BaseHTTPRequestHandler):
                 'caps': grants,
                 'phase': st['phase'],
                 'agent': CFG.get('active_agent', ''),
+                'queue': _queue_view(),
             }))
+        if path == '/api/tasks':
+            return self._send(200, json.dumps({'ok': True,
+                                               'tasks': _queue_view()}))
         path = self.path.lstrip('/') or 'fusion/concept-4-fusion.html'
         if path == 'live.js':
             path = 'fusion/live.js'
@@ -469,5 +549,6 @@ if __name__ == '__main__':
     print('UI:      http://localhost:%d/' % port)
     print('Provider: %s (set ~/.agentui/config.json + %s for a real model)'
           % (CFG['provider'], CFG['api_key_env']))
+    threading.Thread(target=_queue_loop, daemon=True).start()
     threading.Thread(target=_scheduler_loop, daemon=True).start()
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

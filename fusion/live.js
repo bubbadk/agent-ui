@@ -483,6 +483,15 @@
         '<p style="font-style:italic;color:var(--mut)">No active task. Give the agent a goal on the dashboard.</p>') +
       '</div>' +
       '<div class="glass card" style="margin-top:16px">' +
+      '<h3 class="ct">TASK QUEUE · DURABLE EXECUTION</h3>' +
+      ((s.queue || []).length ? (s.queue || []).map(function (q) {
+        var qm = q.status === 'running' ? '\u25c8' : '\u00b7';
+        return nodeRow(q.status, qm, q.goal,
+          q.source + ' · task #' + q.id, q.status);
+      }).join('') :
+        '<p style="font-style:italic;color:var(--mut)">Task queue is empty.</p>') +
+      '</div>' +
+      '<div class="glass card" style="margin-top:16px">' +
       '<h3 class="ct">ACCEPTANCE CRITERIA \u00b7 LATEST GATE RUN</h3>' +
       critHtml + '</div>';
   }
